@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design system utama ada di public/assets/css/app.css (ditulis tangan,
+ * berbasis CSS variable). Tailwind di sini hanya menyediakan utility
+ * tambahan untuk penyesuaian kecil di Blade — jangan menduplikasi komponen
+ * yang sudah punya kelas sendiri di app.css.
+ *
+ * Preflight Tailwind dimatikan karena app.css sudah mengatur reset dan tipografi
+ * dasar; membiarkan keduanya aktif membuat gaya heading dan tombol saling timpa.
+ */

@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"/Users/ikkosatrio/Desktop/ThisPC/My Work/Web/Enery Billing\" && ls -la && echo \"=== js modules ===\" && ls \"enery-billing/public/assets/js/modules\" \"enery-billing/public/assets/js/core\" && echo \"=== images/logo ===\" && ls enery-billing/public/assets/images/logo)",
+      "Bash(cd \"/Users/ikkosatrio/Desktop/ThisPC/My Work/Web\" && ls -la && echo \"=== parent ===\" && ls -la \"/Users/ikkosatrio/Desktop/ThisPC/My Work/Web/Enery Billing\")",
+      "Bash(rm -f app/Http/Controllers/GlobalController.php app/Http/Controllers/Auth/AuthController.php app/Traits/HasCompositePrimaryKey.php)",
+      "Bash(rmdir app/Traits)",
+      "Bash(grep -iE \"^\\(pdo_mysql|pdo_sqlite|sqlite3\\)$\")",
+      "Bash(rm -f composer.lock)",
+      "Bash(composer install *)",
+      "Bash(cp .env.example .env)",
+      "Bash(sed -i '' 's/^DB_PORT=3306$/DB_PORT=3307/' .env)",
+      "Bash(php artisan *)",
+      "Bash(php -r ' *)"
+    ]
+  }
+}

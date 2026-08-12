@@ -1,0 +1,64 @@
+# Development Dockerfile - No code embedded, uses volume mount
+# Lightweight image for fast builds & hot reload during development
+
+FROM php:8.1-fpm-bullseye
+
+# Install dependencies (dev + prod focused on dev needs)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    git \
+    zip \
+    unzip \
+    bash \
+    nano \
+    vim \
+    nginx \
+    libxml2-dev \
+    zlib1g-dev \
+    libonig-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install core PHP extensions
+RUN docker-php-ext-install -j$(nproc) \
+    bcmath \
+    xml \
+    pdo \
+    pdo_mysql
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Copy nginx configuration
+COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY docker/nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf
+
+# Create application user
+RUN groupadd -g 1000 laravel && \
+    useradd -u 1000 -g laravel -s /bin/bash laravel
+
+WORKDIR /app
+
+# Directory setup for development (code will be mounted)
+RUN mkdir -p /app/storage/logs \
+    && mkdir -p /app/storage/framework/{cache,sessions,views} \
+    && mkdir -p /app/bootstrap/cache \
+    && mkdir -p /var/log/nginx \
+    && mkdir -p /var/run/nginx \
+    && chown -R laravel:laravel /app \
+    && chmod -R 777 /app/storage \
+    && chmod -R 777 /app/bootstrap/cache
+
+# Add laravel user to sudoers for development convenience
+RUN echo "laravel ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+# Development entrypoint
+COPY docker/entrypoint.dev.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+EXPOSE 9000 80
+
+# Run as root to start services
+USER root
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

@@ -1,0 +1,30 @@
+version: '3.8'
+
+# Energy Billing — single instance.
+# Laravel Octane di atas FrankenPHP: satu binary (Caddy + PHP) melayani
+# static asset sekaligus menjalankan Laravel, listen di port 80 container.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: enery-billing
+    restart: unless-stopped
+    working_dir: /app
+    env_file:
+      - .env
+    ports:
+      - "${APP_PORT:-8000}:80"
+    volumes:
+      - app-storage:/app/storage
+      - app-cache:/app/bootstrap/cache
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  app-storage:
+  app-cache:
