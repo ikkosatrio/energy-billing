@@ -50,7 +50,15 @@ class DemoDataSeeder extends Seeder
             return;
         }
 
-        $this->call([RolePermissionSeeder::class, SettingSeeder::class, TariffGroupSeeder::class]);
+        // UserSeeder ikut dipanggil supaya seeder ini mandiri: menjalankannya
+        // di instalasi baru langsung menghasilkan aplikasi yang bisa dimasuki,
+        // tidak perlu ingat menjalankan db:seed lebih dulu.
+        $this->call([
+            RolePermissionSeeder::class,
+            SettingSeeder::class,
+            TariffGroupSeeder::class,
+            UserSeeder::class,
+        ]);
 
         $meters = $this->createCustomers();
         $this->createReadings($meters);
