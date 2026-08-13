@@ -4,6 +4,7 @@ namespace App\Livewire\Monitoring;
 
 use App\Models\MeterReading;
 use App\Models\PowerMeter;
+use App\Services\Monitoring\ConsumptionCalculator;
 use Livewire\Attributes\On;
 use Livewire\Component;
 
@@ -14,6 +15,14 @@ class RealtimePage extends Component
 {
     /** Ambang "beban tinggi" dalam persen dari daya tersambung pelanggan. */
     private const HIGH_LOAD_PERCENT = 80;
+
+    /** Livewire tidak menyuntik lewat constructor; diambil dari container. */
+    private ConsumptionCalculator $consumption;
+
+    public function boot(ConsumptionCalculator $consumption): void
+    {
+        $this->consumption = $consumption;
+    }
 
     public bool $autoRefresh = true;
 
@@ -77,17 +86,30 @@ class RealtimePage extends Component
             return [];
         }
 
-        $rows = MeterReading::query()
+        // Dihitung di PHP agar reset meter tidak menghasilkan angka raksasa —
+        // MAX(stand)-MIN(stand) di SQL akan membaca stand sebelum reset
+        // sebagai pemakaian.
+        //
+        // Halaman ini menampilkan seluruh meter aktif sekaligus. Untuk jumlah
+        // meter yang jauh lebih besar, sumber datanya sebaiknya dipindah ke
+        // agregat harian agar tidak memuat pembacaan sehari penuh tiap polling.
+        $readings = MeterReading::query()
             ->whereIn('power_meter_id', $meterIds)
             ->between(now()->startOfDay()->toDateTimeString(), now()->toDateTimeString())
-            ->selectRaw('power_meter_id,
-                         MAX(stand_lwbp) - MIN(stand_lwbp) AS lwbp,
-                         MAX(stand_wbp) - MIN(stand_wbp) AS wbp')
-            ->groupBy('power_meter_id')
-            ->get();
+            ->orderBy('read_at')
+            ->get(['power_meter_id', 'read_at', 'stand_lwbp', 'stand_wbp']);
 
-        return $rows->mapWithKeys(fn ($row) => [
-            $row->power_meter_id => (float) $row->lwbp + (float) $row->wbp,
-        ])->all();
+        // Titik putar tiap meter diambil sekali, lalu dipakai per kelompok.
+        $rolloverAt = PowerMeter::whereIn('id', $meterIds)
+            ->get(['id', 'stand_max', 'multiplier'])
+            ->mapWithKeys(fn ($m) => [$m->id => $m->effective_stand_max]);
+
+        return $readings->groupBy('power_meter_id')
+            ->map(function ($rows, $meterId) use ($rolloverAt) {
+                $usage = $this->consumption->fromReadings($rows, $rolloverAt[$meterId] ?? null);
+
+                return $usage['lwbp'] + $usage['wbp'];
+            })
+            ->all();
     }
 }

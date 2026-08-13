@@ -246,7 +246,12 @@ class InvoiceGenerationTest extends TestCase
 
         $invoice = $this->generate();
 
-        $this->assertEquals(0, $invoice->kwh_lwbp);
+        // Pemakaian dihitung sejak titik reset: stand terakhir 120 kWh.
+        // Sebelumnya kasus ini menghasilkan 0 — pelanggan tidak ditagih
+        // sama sekali atas pemakaian setelah meternya di-reset.
+        $this->assertEquals(120, $invoice->kwh_lwbp);
+        // WBP tidak ikut reset, jadi tetap selisih biasa: 200 - 100.
+        $this->assertEquals(100, $invoice->kwh_wbp);
         $this->assertStringContainsString('Stand meter mundur', $invoice->notes);
     }
 

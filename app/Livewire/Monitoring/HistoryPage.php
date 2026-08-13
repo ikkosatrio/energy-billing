@@ -5,6 +5,7 @@ namespace App\Livewire\Monitoring;
 use App\Models\MeterReading;
 use App\Models\MeterReadingDaily;
 use App\Models\PowerMeter;
+use App\Services\Monitoring\ConsumptionCalculator;
 use Illuminate\Support\Carbon;
 use Livewire\Component;
 
@@ -17,6 +18,14 @@ use Livewire\Component;
  */
 class HistoryPage extends Component
 {
+    /** Livewire tidak menyuntik lewat constructor; diambil dari container. */
+    private ConsumptionCalculator $consumption;
+
+    public function boot(ConsumptionCalculator $consumption): void
+    {
+        $this->consumption = $consumption;
+    }
+
     public ?int $meterId = null;
 
     /** Bulan yang ditampilkan, format Y-m. */
@@ -69,25 +78,29 @@ class HistoryPage extends Component
 
         $date = Carbon::parse($this->day);
 
-        $rows = MeterReading::query()
+        // Dihitung di PHP, bukan lewat MAX(stand)-MIN(stand) di SQL.
+        // Agregasi SQL itu salah besar ketika meter di-reset di tengah jam:
+        // stand 9300 lalu balik ke 0 menghasilkan selisih 9300, padahal
+        // pemakaian sebenarnya hanya puluhan kWh.
+        //
+        // Satu meter untuk satu hari — pada interval 1 menit sekitar 1.440
+        // baris, cukup ringan untuk diproses di memori.
+        $readings = MeterReading::query()
             ->where('power_meter_id', $this->meterId)
             ->between($date->copy()->startOfDay()->toDateTimeString(), $date->copy()->endOfDay()->toDateTimeString())
-            ->selectRaw('HOUR(read_at) AS jam,
-                         MAX(stand_lwbp) - MIN(stand_lwbp) AS lwbp,
-                         MAX(stand_wbp) - MIN(stand_wbp) AS wbp')
-            ->groupBy('jam')
-            ->get()
-            ->keyBy('jam');
+            ->orderBy('read_at')
+            ->get(['read_at', 'stand_lwbp', 'stand_wbp']);
+
+        $hours = $this->consumption->byHour($readings, PowerMeter::find($this->meterId)?->effective_stand_max);
 
         // Seluruh 24 jam selalu dikembalikan supaya sumbu chart tetap utuh
         // walau ada jam yang tidak menerima data.
         $result = [];
         for ($hour = 0; $hour < 24; $hour++) {
-            $row = $rows->get($hour);
             $result[] = [
                 'hour' => $hour,
-                'lwbp' => (float) ($row->lwbp ?? 0),
-                'wbp' => (float) ($row->wbp ?? 0),
+                'lwbp' => $hours[$hour]['lwbp'],
+                'wbp' => $hours[$hour]['wbp'],
             ];
         }
 

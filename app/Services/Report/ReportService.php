@@ -4,6 +4,7 @@ namespace App\Services\Report;
 
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Models\MeterReading;
 use App\Models\MeterReadingDaily;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -96,6 +97,101 @@ class ReportService
                 'outstanding' => $invoice->outstanding,
                 'status' => $invoice->status,
             ]);
+    }
+
+    /** Batas baris export data mentah, menjaga memori worker Excel. */
+    public const RAW_EXPORT_LIMIT = 50_000;
+
+    /**
+     * Query pembacaan mentah satu meter dalam rentang tanggal.
+     *
+     * Selalu dibatasi satu meter: tabelnya bisa berisi jutaan baris, dan
+     * membaca lintas meter tanpa batas akan menghabiskan memori.
+     */
+    public function rawReadingsQuery(int $meterId, Carbon $from, Carbon $to)
+    {
+        return MeterReading::query()
+            ->where('power_meter_id', $meterId)
+            ->between($from->copy()->startOfDay()->toDateTimeString(), $to->copy()->endOfDay()->toDateTimeString())
+            ->orderBy('read_at');
+    }
+
+    /**
+     * Menandai anomali pada deretan pembacaan.
+     *
+     * Dua hal yang dicari:
+     *   stand_mundur — stand kumulatif turun; meter di-reset atau berputar
+     *                  kembali ke nol, dan pemakaiannya jadi tidak terhitung
+     *   jeda         — selisih waktu jauh di atas interval push, artinya
+     *                  gateway sempat mati atau kehilangan jaringan
+     *
+     * $previous adalah pembacaan tepat sebelum baris pertama, supaya baris
+     * pembuka halaman ikut terperiksa dan bukan selalu dianggap normal.
+     *
+     * @param  iterable<MeterReading>  $readings
+     * @return array<int, array<string, mixed>>
+     */
+    public function flagAnomalies(iterable $readings, ?MeterReading $previous = null): array
+    {
+        $interval = max(1, (int) setting('iot_push_interval_seconds', 60));
+
+        // Ambang jeda: 3× interval, tapi minimal 5 menit.
+        //
+        // Kelipatan saja terlalu sensitif pada interval pendek — dengan push
+        // tiap 60 detik, satu-dua push yang telat karena jaringan sudah cukup
+        // menandai hampir semua baris sebagai bermasalah, dan tabel penuh
+        // sorotan merah justru menyembunyikan gangguan yang sungguhan.
+        $gapThreshold = max($interval * 3, 300);
+
+        $rows = [];
+
+        foreach ($readings as $reading) {
+            $standDropped = $previous
+                && ((float) $reading->stand_lwbp < (float) $previous->stand_lwbp
+                    || (float) $reading->stand_wbp < (float) $previous->stand_wbp);
+
+            $gapSeconds = $previous ? $previous->read_at->diffInSeconds($reading->read_at) : null;
+            $hasGap = $gapSeconds !== null && $gapSeconds > $gapThreshold;
+
+            $rows[] = [
+                'reading' => $reading,
+                'delta_lwbp' => $previous ? (float) $reading->stand_lwbp - (float) $previous->stand_lwbp : null,
+                'delta_wbp' => $previous ? (float) $reading->stand_wbp - (float) $previous->stand_wbp : null,
+                'gap_seconds' => $gapSeconds,
+                'stand_dropped' => $standDropped,
+                'has_gap' => $hasGap,
+                'is_anomaly' => $standDropped || $hasGap,
+            ];
+
+            $previous = $reading;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Data mentah siap export. Dibatasi RAW_EXPORT_LIMIT baris.
+     */
+    public function rawReadings(int $meterId, Carbon $from, Carbon $to): Collection
+    {
+        $readings = $this->rawReadingsQuery($meterId, $from, $to)
+            ->limit(self::RAW_EXPORT_LIMIT)
+            ->get();
+
+        return collect($this->flagAnomalies($readings))->map(fn ($row) => [
+            'read_at' => $row['reading']->read_at,
+            'stand_lwbp' => (float) $row['reading']->stand_lwbp,
+            'stand_wbp' => (float) $row['reading']->stand_wbp,
+            'delta_lwbp' => $row['delta_lwbp'],
+            'delta_wbp' => $row['delta_wbp'],
+            'active_power_kw' => $row['reading']->active_power_kw,
+            'voltage_r' => $row['reading']->voltage_r,
+            'current_r' => $row['reading']->current_r,
+            'power_factor' => $row['reading']->power_factor,
+            'frequency' => $row['reading']->frequency,
+            'source' => $row['reading']->source,
+            'catatan' => $row['stand_dropped'] ? 'Stand mundur' : ($row['has_gap'] ? 'Jeda data' : ''),
+        ]);
     }
 
     /**

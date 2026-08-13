@@ -92,6 +92,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('report')->name('report.')->middleware('can:report.view')->group(function () {
         Route::get('usage', [ReportController::class, 'usage'])->name('usage');
         Route::get('billing', [ReportController::class, 'billing'])->name('billing');
+        Route::get('readings', [ReportController::class, 'readings'])->name('readings');
         Route::get('export/{type}/{format}', [ReportController::class, 'export'])->name('export');
     });
 

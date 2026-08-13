@@ -29,6 +29,7 @@ class PowerMeter extends Model
         'location',
         'ct_ratio',
         'multiplier',
+        'stand_max',
         'status',
         'installed_at',
         'notes',
@@ -36,6 +37,7 @@ class PowerMeter extends Model
 
     protected $casts = [
         'multiplier' => 'decimal:4',
+        'stand_max' => 'decimal:2',
         'installed_at' => 'date',
         'last_seen_at' => 'datetime',
     ];
@@ -82,6 +84,18 @@ class PowerMeter extends Model
         return $this->last_seen_at->gt(now()->subMinutes(self::OFFLINE_AFTER_MINUTES))
             ? 'online'
             : 'offline';
+    }
+
+    /**
+     * Titik putar register dalam satuan yang sama dengan kolom stand di
+     * `meter_readings` — yaitu setelah dikali CT, karena pembacaan sudah
+     * dikalikan saat disimpan.
+     */
+    public function getEffectiveStandMaxAttribute(): ?float
+    {
+        return $this->stand_max === null
+            ? null
+            : (float) $this->stand_max * (float) $this->multiplier;
     }
 
     public function isOnline(): bool

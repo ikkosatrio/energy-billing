@@ -283,7 +283,7 @@ class MeterIngestTest extends TestCase
         $this->assertEquals(240, MeterReadingDaily::first()->kwh_lwbp);
     }
 
-    public function test_stand_yang_mundur_dianggap_nol_bukan_negatif(): void
+    public function test_stand_yang_mundur_dihitung_sejak_titik_reset(): void
     {
         $meter = $this->meter();
 
@@ -297,7 +297,11 @@ class MeterIngestTest extends TestCase
 
         $daily = MeterReadingDaily::first();
 
-        $this->assertEquals(0, $daily->kwh_lwbp);
+        // Angka meter setelah reset dihitung sebagai pemakaian sejak reset,
+        // bukan dinolkan — lihat Tests\Feature\MeterResetTest.
+        $this->assertEquals(12, $daily->kwh_lwbp);
+        // Register WBP tidak ikut reset, jadi tetap selisih biasa.
         $this->assertEquals(30, $daily->kwh_wbp);
+        $this->assertSame(1, $daily->reset_count);
     }
 }

@@ -48,6 +48,7 @@ class PowerMeterPage extends Component
             'form.location' => ['nullable', 'string', 'max:255'],
             'form.ct_ratio' => ['nullable', 'string', 'max:50'],
             'form.multiplier' => ['required', 'numeric', 'min:0.0001'],
+            'form.stand_max' => ['nullable', 'numeric', 'min:1'],
             'form.status' => ['required', 'in:active,inactive,maintenance'],
             'form.installed_at' => ['nullable', 'date'],
             'form.notes' => ['nullable', 'string'],
@@ -60,6 +61,7 @@ class PowerMeterPage extends Component
             'form.code' => 'kode meter',
             'form.name' => 'nama meter',
             'form.multiplier' => 'pengali',
+            'form.stand_max' => 'angka maksimum register',
         ];
     }
 
@@ -87,6 +89,7 @@ class PowerMeterPage extends Component
             'location' => $meter->location,
             'ct_ratio' => $meter->ct_ratio,
             'multiplier' => $meter->multiplier,
+            'stand_max' => $meter->stand_max,
             'status' => $meter->status,
             'installed_at' => $meter->installed_at?->toDateString(),
             'notes' => $meter->notes,
@@ -152,6 +155,7 @@ class PowerMeterPage extends Component
             'location' => '',
             'ct_ratio' => '',
             'multiplier' => 1,
+            'stand_max' => null,
             'status' => 'active',
             'installed_at' => null,
             'notes' => '',

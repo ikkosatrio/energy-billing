@@ -30,6 +30,7 @@ class MeterReadingDaily extends Model
         'peak_kw',
         'peak_at',
         'reading_count',
+        'reset_count',
     ];
 
     protected $casts = [
@@ -43,6 +44,7 @@ class MeterReadingDaily extends Model
         'peak_kw' => 'decimal:2',
         'peak_at' => 'datetime',
         'reading_count' => 'integer',
+        'reset_count' => 'integer',
     ];
 
     public function powerMeter(): BelongsTo
@@ -62,6 +64,16 @@ class MeterReadingDaily extends Model
     public function getIsIncompleteAttribute(): bool
     {
         return $this->reading_count < (self::EXPECTED_READINGS * 0.9);
+    }
+
+    /**
+     * Hari yang mengandung reset meter — angkanya masih dihitung dari
+     * penjumlahan selisih, tapi tetap perlu diperiksa manusia karena sisa
+     * pemakaian sebelum titik reset tidak bisa dipastikan.
+     */
+    public function getHasResetAttribute(): bool
+    {
+        return $this->reset_count > 0;
     }
 
     public function scopeBetween(Builder $query, string $from, string $to): Builder

@@ -15,6 +15,10 @@ use Illuminate\Support\Carbon;
  */
 class DailyAggregationService
 {
+    public function __construct(private readonly ConsumptionCalculator $consumption)
+    {
+    }
+
     /**
      * Menghitung ulang ringkasan satu meter untuk satu tanggal.
      * Aman diulang: memakai updateOrCreate, jadi menjalankan ulang untuk
@@ -38,6 +42,12 @@ class DailyAggregationService
         $last = $readings->last();
         $peak = $readings->whereNotNull('active_power_kw')->sortByDesc('active_power_kw')->first();
 
+        // Dihitung dari penjumlahan selisih antar pembacaan, bukan sekadar
+        // stand akhir dikurangi stand awal. Bedanya baru terasa saat meter
+        // di-reset di tengah hari: cara lama menghasilkan 0 dan menghapus
+        // seluruh pemakaian hari itu.
+        $usage = $this->consumption->fromReadings($readings, $meter->effective_stand_max);
+
         return MeterReadingDaily::updateOrCreate(
             ['power_meter_id' => $meter->id, 'date' => $date->toDateString()],
             [
@@ -45,11 +55,12 @@ class DailyAggregationService
                 'stand_lwbp_end' => $last->stand_lwbp,
                 'stand_wbp_start' => $first->stand_wbp,
                 'stand_wbp_end' => $last->stand_wbp,
-                'kwh_lwbp' => $this->delta($first->stand_lwbp, $last->stand_lwbp),
-                'kwh_wbp' => $this->delta($first->stand_wbp, $last->stand_wbp),
+                'kwh_lwbp' => $usage['lwbp'],
+                'kwh_wbp' => $usage['wbp'],
                 'peak_kw' => $peak?->active_power_kw,
                 'peak_at' => $peak?->read_at,
                 'reading_count' => $readings->count(),
+                'reset_count' => $usage['reset_count'] + $usage['rollover_count'],
             ],
         );
     }
@@ -76,16 +87,4 @@ class DailyAggregationService
         return $count;
     }
 
-    /**
-     * Selisih dua stand kumulatif.
-     *
-     * Hasil negatif berarti meter di-reset atau angkanya berputar kembali ke
-     * nol. Nilainya dinolkan, bukan dibiarkan negatif, agar tidak mengurangi
-     * total pemakaian bulan berjalan — kasus seperti ini perlu dikoreksi
-     * manual lewat catatan pada invoice.
-     */
-    private function delta(float|string $start, float|string $end): float
-    {
-        return max(0, (float) $end - (float) $start);
-    }
 }

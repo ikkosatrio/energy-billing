@@ -154,7 +154,8 @@ class InvoiceGenerator
             $notes[] = 'Tidak ada pembacaan meter pada periode ini — pemakaian tercatat 0.';
         }
         if ($usage['meter_reset']) {
-            $notes[] = 'Stand meter mundur (kemungkinan reset/rollover). Pemakaian perlu dikoreksi manual.';
+            $notes[] = 'Stand meter mundur (reset/rollover). Pemakaian dihitung dari penjumlahan '
+                .'selisih antar pembacaan, bukan selisih stand awal-akhir — mohon diperiksa.';
         }
 
         /*

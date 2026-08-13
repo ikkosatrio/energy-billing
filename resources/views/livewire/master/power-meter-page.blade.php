@@ -171,6 +171,21 @@
                             </div>
 
                             <div class="field">
+                                <label class="field-label">Angka Maksimum Register</label>
+                                <input type="number" step="0.01" min="1"
+                                       class="input mono @error('form.stand_max') is-invalid @enderror"
+                                       placeholder="999999.99"
+                                       wire:model="form.stand_max">
+                                @error('form.stand_max') <div class="field-error">{{ $message }}</div> @enderror
+                                <div class="card-sub">
+                                    Angka tertinggi register sebelum berputar kembali ke nol —
+                                    <span class="mono">999999.99</span> untuk register 6 digit.
+                                    Isi apa adanya dari spesifikasi meter, sebelum dikali CT.
+                                    Dikosongkan pun aman: stand yang mundur akan dianggap meter di-reset.
+                                </div>
+                            </div>
+
+                            <div class="field">
                                 <label class="field-label">Status</label>
                                 <x-select-search wire:model="form.status"
                                     :options="[

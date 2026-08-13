@@ -60,6 +60,13 @@ class DemoDataSeeder extends Seeder
             UserSeeder::class,
         ]);
 
+        // Setting interval push disamakan dengan interval data yang dibuat di
+        // bawah. Tanpa ini, halaman Data Meter Mentah menandai SETIAP baris
+        // sebagai "jeda data" dan persentase kelengkapan di Status Perangkat
+        // ikut salah — bukan karena datanya bermasalah, melainkan karena
+        // settingnya bercerita lain.
+        app(\App\Services\SettingService::class)->put('iot_push_interval_seconds', self::READING_INTERVAL * 60);
+
         $meters = $this->createCustomers();
         $this->createReadings($meters);
         $this->aggregate();

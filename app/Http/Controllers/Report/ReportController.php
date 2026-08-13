@@ -26,6 +26,11 @@ class ReportController extends Controller
         return view('report.billing.index');
     }
 
+    public function readings()
+    {
+        return view('report.readings.index');
+    }
+
     /**
      * Export laporan ke Excel atau PDF.
      *
@@ -36,22 +41,35 @@ class ReportController extends Controller
     {
         $this->authorize('report.export');
 
-        abort_unless(in_array($type, ['usage', 'billing'], true), 404);
+        abort_unless(in_array($type, ['usage', 'billing', 'readings'], true), 404);
         abort_unless(in_array($format, ['xlsx', 'pdf'], true), 404);
+
+        // Data mentah hanya masuk akal sebagai Excel — ribuan baris tidak
+        // terbaca di PDF.
+        abort_if($type === 'readings' && $format === 'pdf', 404);
 
         $validated = $request->validate([
             'from' => ['required', 'date'],
             'to' => ['required', 'date', 'after_or_equal:from'],
             'customer_id' => ['nullable', 'integer'],
+            // Wajib untuk data mentah: tabelnya terlalu besar untuk dibaca
+            // lintas meter sekaligus.
+            'meter_id' => [$type === 'readings' ? 'required' : 'nullable', 'integer', 'exists:power_meters,id'],
         ]);
 
         $from = Carbon::parse($validated['from']);
         $to = Carbon::parse($validated['to']);
         $customerId = $validated['customer_id'] ?? null;
 
-        [$rows, $headings, $title] = $type === 'usage'
-            ? [$this->reports->usage($from, $to, $customerId), $this->usageHeadings(), 'Rekap Pemakaian kWh']
-            : [$this->reports->billing($from, $to, $customerId), $this->billingHeadings(), 'Rekap Tagihan & Penerimaan'];
+        [$rows, $headings, $title] = match ($type) {
+            'usage' => [$this->reports->usage($from, $to, $customerId), $this->usageHeadings(), 'Rekap Pemakaian kWh'],
+            'billing' => [$this->reports->billing($from, $to, $customerId), $this->billingHeadings(), 'Rekap Tagihan & Penerimaan'],
+            'readings' => [
+                $this->reports->rawReadings((int) $validated['meter_id'], $from, $to),
+                $this->readingHeadings(),
+                'Data Meter Mentah',
+            ],
+        };
 
         $filename = str($title)->slug().'-'.$from->format('Ymd').'-'.$to->format('Ymd');
 
@@ -73,6 +91,12 @@ class ReportController extends Controller
     {
         return ['Pelanggan', 'Kode', 'Meter', 'Golongan', 'LWBP (kWh)', 'WBP (kWh)',
             'Total kWh', 'Beban Puncak (kW)', 'Hari Berdata', 'Tagihan (Rp)'];
+    }
+
+    private function readingHeadings(): array
+    {
+        return ['Waktu Baca', 'Stand LWBP', 'Stand WBP', 'Δ LWBP', 'Δ WBP', 'Daya (kW)',
+            'Tegangan R', 'Arus R', 'Power Factor', 'Frekuensi', 'Sumber', 'Catatan'];
     }
 
     private function billingHeadings(): array

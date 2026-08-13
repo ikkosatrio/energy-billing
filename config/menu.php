@@ -141,6 +141,12 @@ return [
                 'icon' => 'banknote',
                 'permits' => ['report.view'],
             ],
+            [
+                'title' => 'Data Meter Mentah',
+                'route' => 'report.readings',
+                'icon' => 'list',
+                'permits' => ['report.view'],
+            ],
         ],
     ],
 

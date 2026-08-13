@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\BillingPeriod;
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Models\MeterReading;
 use App\Models\MeterReadingDaily;
 use App\Models\PowerMeter;
 use App\Models\Role;
@@ -156,5 +157,129 @@ class ReportTest extends TestCase
     {
         $this->get(route('report.export', ['type' => 'salah', 'format' => 'xlsx']).'?from=2026-07-01&to=2026-07-31')
             ->assertNotFound();
+    }
+
+    // ── Laporan data mentah ──────────────────────────────────────────────
+
+    private function meterWithReadings(array $readings): PowerMeter
+    {
+        $meter = PowerMeter::create([
+            'code' => 'MTR-RAW', 'name' => 'Panel Raw', 'multiplier' => 1, 'status' => 'active',
+        ]);
+
+        MeterReading::insert(array_map(fn ($r) => [
+            'power_meter_id' => $meter->id,
+            'read_at' => $r[0],
+            'stand_lwbp' => $r[1],
+            'stand_wbp' => $r[2],
+            'source' => 'api',
+        ], $readings));
+
+        return $meter;
+    }
+
+    public function test_pembacaan_normal_tidak_ditandai_anomali(): void
+    {
+        $meter = $this->meterWithReadings([
+            ['2026-07-01 10:00:00', 1000, 400],
+            ['2026-07-01 10:01:00', 1010, 400],
+            ['2026-07-01 10:02:00', 1020, 400],
+        ]);
+
+        $rows = app(ReportService::class)->flagAnomalies(
+            app(ReportService::class)->rawReadingsQuery($meter->id, Carbon::parse('2026-07-01'), Carbon::parse('2026-07-01'))->get()
+        );
+
+        $this->assertCount(3, $rows);
+        $this->assertSame([false, false, false], array_column($rows, 'is_anomaly'));
+        // Baris pertama tidak punya pembanding, jadi delta-nya null.
+        $this->assertNull($rows[0]['delta_lwbp']);
+        $this->assertEquals(10, $rows[1]['delta_lwbp']);
+    }
+
+    public function test_stand_yang_mundur_ditandai(): void
+    {
+        $meter = $this->meterWithReadings([
+            ['2026-07-01 10:00:00', 9000, 400],
+            ['2026-07-01 10:01:00', 12, 400],
+        ]);
+
+        $rows = app(ReportService::class)->flagAnomalies(
+            app(ReportService::class)->rawReadingsQuery($meter->id, Carbon::parse('2026-07-01'), Carbon::parse('2026-07-01'))->get()
+        );
+
+        $this->assertFalse($rows[0]['is_anomaly']);
+        $this->assertTrue($rows[1]['stand_dropped']);
+        $this->assertTrue($rows[1]['is_anomaly']);
+    }
+
+    public function test_jeda_data_ditandai(): void
+    {
+        // Interval push 60 detik; ambangnya 2x, jadi lompatan 30 menit ditandai.
+        $meter = $this->meterWithReadings([
+            ['2026-07-01 10:00:00', 1000, 400],
+            ['2026-07-01 10:30:00', 1300, 400],
+        ]);
+
+        $rows = app(ReportService::class)->flagAnomalies(
+            app(ReportService::class)->rawReadingsQuery($meter->id, Carbon::parse('2026-07-01'), Carbon::parse('2026-07-01'))->get()
+        );
+
+        $this->assertTrue($rows[1]['has_gap']);
+        $this->assertSame(1800, $rows[1]['gap_seconds']);
+    }
+
+    /**
+     * Baris pembuka halaman harus tetap diperiksa terhadap pembacaan
+     * sebelumnya, bukan otomatis dianggap normal.
+     */
+    public function test_baris_pertama_halaman_dibandingkan_dengan_pembacaan_sebelumnya(): void
+    {
+        $meter = $this->meterWithReadings([
+            ['2026-07-01 10:00:00', 9000, 400],
+            ['2026-07-01 10:01:00', 12, 400],
+        ]);
+
+        $service = app(ReportService::class);
+        $all = $service->rawReadingsQuery($meter->id, Carbon::parse('2026-07-01'), Carbon::parse('2026-07-01'))->get();
+
+        // Halaman kedua berisi baris ke-2 saja, dengan baris ke-1 sebagai pembanding.
+        $rows = $service->flagAnomalies([$all[1]], $all[0]);
+
+        $this->assertTrue($rows[0]['stand_dropped']);
+    }
+
+    public function test_export_data_mentah_menghasilkan_excel(): void
+    {
+        $meter = $this->meterWithReadings([
+            ['2026-07-01 10:00:00', 1000, 400],
+            ['2026-07-01 10:01:00', 1010, 400],
+        ]);
+
+        $this->get(route('report.export', ['type' => 'readings', 'format' => 'xlsx'])
+            ."?from=2026-07-01&to=2026-07-01&meter_id={$meter->id}")
+            ->assertOk();
+    }
+
+    public function test_export_data_mentah_wajib_menyertakan_meter(): void
+    {
+        $this->get(route('report.export', ['type' => 'readings', 'format' => 'xlsx']).'?from=2026-07-01&to=2026-07-01')
+            ->assertSessionHasErrors('meter_id');
+    }
+
+    public function test_export_data_mentah_ke_pdf_ditolak(): void
+    {
+        $meter = $this->meterWithReadings([['2026-07-01 10:00:00', 1000, 400]]);
+
+        $this->get(route('report.export', ['type' => 'readings', 'format' => 'pdf'])
+            ."?from=2026-07-01&to=2026-07-01&meter_id={$meter->id}")
+            ->assertNotFound();
+    }
+
+    public function test_halaman_data_mentah_terbuka(): void
+    {
+        $this->meterWithReadings([['2026-07-01 10:00:00', 1000, 400]]);
+
+        $this->get(route('report.readings'))->assertOk();
     }
 }

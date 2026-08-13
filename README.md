@@ -23,7 +23,7 @@ akhir periode lalu menerbitkan invoice otomatis.
 | Billing & Invoice   | Periode billing, generate invoice, pembayaran + bukti transfer      |
 | Master Data         | Data pelanggan (= gudang), power meter device                       |
 | Tarif & Konfigurasi | Golongan tarif berperiode, jadwal WBP/LWBP                          |
-| Report              | Rekap pemakaian kWh, rekap tagihan & penerimaan (Excel/PDF)         |
+| Report              | Rekap pemakaian kWh, rekap tagihan & penerimaan, data meter mentah  |
 | Sistem              | Setting aplikasi, user, role & hak akses, log aktivitas             |
 
 ## Aturan bisnis utama
@@ -39,8 +39,57 @@ akhir periode lalu menerbitkan invoice otomatis.
   generate, sehingga invoice lama tidak ikut berubah ketika data induk diperbarui.
 - Tanggal generate invoice memakai **default global** dari setting sistem, dan
   boleh di-override per pelanggan (`customers.billing_day`).
-- Stand meter yang mundur (reset/rollover) **dinolkan dan ditandai** di catatan
-  invoice, tidak pernah menghasilkan pemakaian negatif.
+- Stand meter yang mundur (reset/rollover) tetap **dihitung sejak titik reset**
+  dan ditandai — lihat bagian di bawah.
+
+## Penanganan meter yang di-reset
+
+Seluruh perhitungan kWh memakai **penjumlahan selisih antar pembacaan
+berurutan**, bukan sekadar stand akhir dikurangi stand awal. Bedanya baru
+terasa ketika meter di-reset di tengah periode.
+
+Contoh: meter dipakai 300 kWh, di-reset ke 0, lalu dipakai 80 kWh lagi —
+pemakaian sebenarnya 380 kWh.
+
+| Cara hitung | Hasil |
+| ----------- | ----- |
+| `max(0, akhir − awal)` | 0 — seluruh pemakaian hilang, pelanggan tidak ditagih |
+| `MAX(stand) − MIN(stand)` | 9.300 — membengkak 24×, tanpa tanda apa pun |
+| **Jumlah selisih positif** | **380** ✓ |
+
+Diterapkan di enam tempat: invoice, agregat harian, chart per jam, kWh hari ini
+di monitoring, ringkasan data mentah, dan seluruh rekap yang membaca agregat
+harian. Dikunci oleh `tests/Feature/MeterResetTest.php`.
+
+Jalur normal tetap memakai selisih stand yang murah; penjumlahan selisih hanya
+ditempuh ketika reset terdeteksi.
+
+### Reset vs rollover
+
+Keduanya sama-sama terlihat sebagai stand yang mundur, tapi pemakaiannya
+berbeda dan ditangani berbeda:
+
+| Kejadian | Penanganan |
+| -------- | ---------- |
+| **Reset** — meter diganti/dinolkan teknisi | Pemakaian dihitung dari nol, sebesar angka barunya |
+| **Rollover** — register penuh lalu berputar | Sisa pemakaian sampai titik putar ikut dihitung |
+
+Rollover butuh **Angka Maksimum Register** pada data power meter (mis.
+`999999.99` untuk register 6 digit, diisi apa adanya dari spesifikasi meter —
+pengali CT diterapkan aplikasi).
+
+Membedakannya memakai kedekatan ke batas: stand 999.980 yang jatuh ke 30 adalah
+rollover, sedangkan 9.000 yang jatuh ke 80 pada meter berbatas 999.999 jelas
+penggantian meter — dan tidak boleh ditambahi ~990.000 kWh yang tidak pernah
+dipakai.
+
+**Bila kolom itu dikosongkan**, rollover diperlakukan sebagai reset. Aman, tapi
+sisa pemakaian sampai titik putar hilang — besarnya terbatas pada pemakaian
+satu interval pembacaan (contoh nyata: 19,99 kWh dari 129,99 kWh).
+
+Seluruh kejadian ditandai di catatan invoice, kolom `reset_count` pada agregat
+harian, dan kolom Catatan pada laporan Data Meter Mentah. Invoice yang terkena
+tetap berstatus draft walau penerbitan otomatis menyala.
 
 ## Setup lokal
 
@@ -224,6 +273,35 @@ php artisan schedule:work
 Pengiriman email invoice lewat antrean ditangani service **`queue`**
 (`queue:work`). Tanpa container itu, email otomatis tidak akan terkirim —
 job-nya menumpuk di tabel `jobs`.
+
+## Laporan data meter mentah
+
+**Report → Data Meter Mentah** menampilkan pembacaan asli dari gateway, dipakai
+saat menelusuri angka tagihan yang dianggap janggal atau memeriksa gateway yang
+datanya bolong.
+
+Selalu terikat pada **satu meter + rentang tanggal** — tabel `meter_readings`
+bisa berisi jutaan baris, jadi membacanya lintas meter tanpa batas akan
+menghabiskan memori.
+
+Dua jenis masalah ditandai otomatis:
+
+| Tanda | Arti |
+| ----- | ---- |
+| **Stand mundur** | Stand kumulatif turun — meter di-reset atau berputar ke nol. Pemakaian pada rentang itu tidak terhitung |
+| **Jeda N mnt** | Selisih waktu melebihi 3× interval push (minimal 5 menit) — gateway sempat mati atau kehilangan jaringan |
+
+Ambangnya sengaja tidak seketat kelipatan interval saja: dengan push tiap 60
+detik, satu-dua push telat karena jaringan sudah cukup menandai hampir semua
+baris, dan tabel penuh sorotan merah justru menyembunyikan gangguan sungguhan.
+
+Kolom Δ LWBP / Δ WBP menunjukkan selisih terhadap baris sebelumnya. Baris
+pertama tiap halaman tetap dibandingkan dengan pembacaan sebelum halaman itu,
+sehingga masalah di batas halaman tidak terlewat.
+
+Export tersedia dalam Excel saja (maksimal 50.000 baris) — ribuan baris tidak
+terbaca di PDF. Penyaring "hanya baris bermasalah" bekerja per halaman; untuk
+pemeriksaan menyeluruh gunakan export.
 
 ## Penerbitan invoice otomatis
 
