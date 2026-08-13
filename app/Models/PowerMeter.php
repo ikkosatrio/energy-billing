@@ -27,17 +27,11 @@ class PowerMeter extends Model
         'brand',
         'model',
         'location',
-        'device_key',
         'ct_ratio',
         'multiplier',
         'status',
         'installed_at',
         'notes',
-    ];
-
-    protected $hidden = [
-        // Token perangkat tidak boleh ikut terbawa saat model di-serialize.
-        'device_key',
     ];
 
     protected $casts = [

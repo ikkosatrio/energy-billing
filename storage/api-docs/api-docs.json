@@ -1,0 +1,577 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "Energy Billing API",
+        "description": "API untuk gateway IoT mengirim pembacaan power meter ke aplikasi Energy Billing.\n\n## Identifikasi meter\n\nSetiap permintaan menyebut meter lewat `meter_id` — ID numerik yang tampil di\nhalaman **Power Meter Device** dan bisa dilihat kapan saja. Daftar lengkapnya\njuga tersedia lewat `GET /api/v1/meters`.\n\n## Autentikasi\n\nSeluruh endpoint memakai satu API token global yang sama untuk semua gateway.\nKirim lewat header:\n\n```\nX-Api-Token: <token>\n```\n\nToken diatur di menu **Setting Aplikasi → Integrasi IoT**, bisa dilihat,\ndisalin, dan digenerate ulang kapan saja. Bila token di setting dikosongkan,\nautentikasi dimatikan — hanya lakukan itu bila server benar-benar tertutup di\njaringan internal, karena data yang masuk endpoint ini langsung menentukan\nnominal tagihan pelanggan.",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "/",
+            "description": "Server saat ini (mengikuti host halaman ini)"
+        },
+        {
+            "url": "https://staging.example.test",
+            "description": "Staging"
+        },
+        {
+            "url": "https://billing.example.test",
+            "description": "Produksi"
+        }
+    ],
+    "paths": {
+        "/api/v1/readings": {
+            "post": {
+                "tags": [
+                    "Meter Readings"
+                ],
+                "summary": "Kirim pembacaan power meter",
+                "description": "Menerima satu pembacaan atau sekumpulan pembacaan untuk **satu meter**.\n\n`stand_lwbp` dan `stand_wbp` adalah **angka kumulatif meter**, bukan\npemakaian per interval. Tagihan dihitung dari selisih stand awal dan\nakhir periode, sehingga data yang bolong di tengah periode tidak\nmerusak perhitungan.\n\nPembacaan dengan `read_at` yang sudah tercatat akan **diabaikan**, bukan\nditimpa — aman bila gateway mengirim ulang buffer setelah jaringan pulih.\n\nNilai stand dikalikan `multiplier` (rasio CT) milik meter sebelum\ndisimpan, jadi kirim angka apa adanya dari perangkat.",
+                "operationId": "storeMeterReadings",
+                "requestBody": {
+                    "description": "meter_id dikirim di dalam body JSON, bukan di URL. Pilih contoh \"Kiriman tunggal\" atau \"Kiriman batch\" pada dropdown di bawah.",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "oneOf": [
+                                    {
+                                        "$ref": "#/components/schemas/SingleReadingRequest"
+                                    },
+                                    {
+                                        "$ref": "#/components/schemas/BatchReadingRequest"
+                                    }
+                                ]
+                            },
+                            "examples": {
+                                "tunggal": {
+                                    "summary": "Kiriman tunggal — dipakai tiap interval",
+                                    "value": {
+                                        "meter_id": 1,
+                                        "read_at": "2026-08-13T10:35:00+07:00",
+                                        "stand_lwbp": 1270280.5,
+                                        "stand_wbp": 414260.2,
+                                        "active_power_kw": 412.6,
+                                        "voltage_r": 380.1,
+                                        "voltage_s": 379.8,
+                                        "voltage_t": 380.4,
+                                        "current_r": 410.2,
+                                        "current_s": 415.1,
+                                        "current_t": 408.9,
+                                        "power_factor": 0.95,
+                                        "frequency": 50
+                                    }
+                                },
+                                "minimal": {
+                                    "summary": "Kiriman minimal — hanya field wajib",
+                                    "value": {
+                                        "meter_id": 1,
+                                        "read_at": "2026-08-13T10:35:00+07:00",
+                                        "stand_lwbp": 1270280.5,
+                                        "stand_wbp": 414260.2
+                                    }
+                                },
+                                "batch": {
+                                    "summary": "Kiriman batch — buffer setelah gateway offline",
+                                    "value": {
+                                        "meter_id": 1,
+                                        "readings": [
+                                            {
+                                                "read_at": "2026-08-13T10:33:00+07:00",
+                                                "stand_lwbp": 1270260.1,
+                                                "stand_wbp": 414258,
+                                                "active_power_kw": 408.2
+                                            },
+                                            {
+                                                "read_at": "2026-08-13T10:34:00+07:00",
+                                                "stand_lwbp": 1270270.3,
+                                                "stand_wbp": 414259.1,
+                                                "active_power_kw": 410.9
+                                            },
+                                            {
+                                                "read_at": "2026-08-13T10:35:00+07:00",
+                                                "stand_lwbp": 1270280.5,
+                                                "stand_wbp": 414260.2,
+                                                "active_power_kw": 412.6
+                                            }
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Pembacaan diterima.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/IngestResult"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "API token tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorMessage"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Meter berstatus nonaktif.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorMessage"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Payload tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "ApiToken": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/meters": {
+            "get": {
+                "tags": [
+                    "Meter Readings"
+                ],
+                "summary": "Daftar ID meter",
+                "description": "Dipakai gateway untuk memetakan perangkat di lapangan ke `meter_id` yang benar. Daftar yang sama juga terlihat di halaman Power Meter Device.",
+                "operationId": "listMeters",
+                "responses": {
+                    "200": {
+                        "description": "Daftar meter yang aktif menerima data.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/MeterSummary"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "API token tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorMessage"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "ApiToken": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ping": {
+            "get": {
+                "tags": [
+                    "Meter Readings"
+                ],
+                "summary": "Cek koneksi & konfigurasi",
+                "description": "Dipakai gateway saat start-up untuk memastikan token masih berlaku dan mengambil interval push yang dikonfigurasi di aplikasi.",
+                "operationId": "ping",
+                "responses": {
+                    "200": {
+                        "description": "Server siap menerima data.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "OK"
+                                        },
+                                        "server_time": {
+                                            "type": "string",
+                                            "format": "date-time"
+                                        },
+                                        "push_interval_seconds": {
+                                            "type": "integer",
+                                            "example": 60
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "API token tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorMessage"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "ApiToken": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "ReadingItem": {
+                "title": "Reading",
+                "description": "Satu pembacaan meter pada satu titik waktu.",
+                "required": [
+                    "read_at",
+                    "stand_lwbp",
+                    "stand_wbp"
+                ],
+                "properties": {
+                    "read_at": {
+                        "description": "Waktu pembacaan di sisi meter. Sertakan offset zona waktu.",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-08-13T10:35:00+07:00"
+                    },
+                    "stand_lwbp": {
+                        "description": "Stand kumulatif register LWBP (kWh), bukan pemakaian per interval.",
+                        "type": "number",
+                        "format": "float",
+                        "example": 1270280.5
+                    },
+                    "stand_wbp": {
+                        "description": "Stand kumulatif register WBP (kWh).",
+                        "type": "number",
+                        "format": "float",
+                        "example": 414260.2
+                    },
+                    "active_power_kw": {
+                        "description": "Daya aktif sesaat, dipakai halaman real-time dan beban puncak.",
+                        "type": "number",
+                        "format": "float",
+                        "example": 412.6,
+                        "nullable": true
+                    },
+                    "voltage_r": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 380.1,
+                        "nullable": true
+                    },
+                    "voltage_s": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 379.8,
+                        "nullable": true
+                    },
+                    "voltage_t": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 380.4,
+                        "nullable": true
+                    },
+                    "current_r": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 410.2,
+                        "nullable": true
+                    },
+                    "current_s": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 415.1,
+                        "nullable": true
+                    },
+                    "current_t": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 408.9,
+                        "nullable": true
+                    },
+                    "power_factor": {
+                        "description": "Antara -1 dan 1.",
+                        "type": "number",
+                        "format": "float",
+                        "example": 0.95,
+                        "nullable": true
+                    },
+                    "frequency": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 50,
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "SingleReadingRequest": {
+                "title": "Kiriman tunggal",
+                "description": "Bentuk paling umum: satu pembacaan per permintaan, dikirim tiap interval.",
+                "required": [
+                    "meter_id",
+                    "read_at",
+                    "stand_lwbp",
+                    "stand_wbp"
+                ],
+                "properties": {
+                    "meter_id": {
+                        "description": "ID meter — kolom pertama pada halaman Power Meter Device, atau dari GET /api/v1/meters.",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "read_at": {
+                        "description": "Waktu pembacaan di sisi meter. Sertakan offset zona waktu.",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-08-13T10:35:00+07:00"
+                    },
+                    "stand_lwbp": {
+                        "description": "Stand kumulatif register LWBP (kWh).",
+                        "type": "number",
+                        "format": "float",
+                        "example": 1270280.5
+                    },
+                    "stand_wbp": {
+                        "description": "Stand kumulatif register WBP (kWh).",
+                        "type": "number",
+                        "format": "float",
+                        "example": 414260.2
+                    },
+                    "active_power_kw": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 412.6,
+                        "nullable": true
+                    },
+                    "voltage_r": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 380.1,
+                        "nullable": true
+                    },
+                    "voltage_s": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 379.8,
+                        "nullable": true
+                    },
+                    "voltage_t": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 380.4,
+                        "nullable": true
+                    },
+                    "current_r": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 410.2,
+                        "nullable": true
+                    },
+                    "current_s": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 415.1,
+                        "nullable": true
+                    },
+                    "current_t": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 408.9,
+                        "nullable": true
+                    },
+                    "power_factor": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 0.95,
+                        "nullable": true
+                    },
+                    "frequency": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 50,
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "BatchReadingRequest": {
+                "title": "Kiriman batch",
+                "description": "Dipakai saat gateway mengirim buffer yang tertahan selama offline. Maksimal 1000 baris, seluruhnya milik satu meter.",
+                "required": [
+                    "meter_id",
+                    "readings"
+                ],
+                "properties": {
+                    "meter_id": {
+                        "description": "ID meter — berlaku untuk seluruh baris pada readings.",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "readings": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ReadingItem"
+                        },
+                        "maxItems": 1000
+                    }
+                },
+                "type": "object"
+            },
+            "IngestResult": {
+                "title": "Hasil penerimaan",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "Pembacaan diterima."
+                    },
+                    "meter_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "meter_code": {
+                        "type": "string",
+                        "example": "AW9L-IRC38"
+                    },
+                    "stored": {
+                        "description": "Jumlah baris yang benar-benar tersimpan.",
+                        "type": "integer",
+                        "example": 3
+                    },
+                    "duplicate": {
+                        "description": "Baris yang diabaikan karena timestamp-nya sudah tercatat.",
+                        "type": "integer",
+                        "example": 0
+                    },
+                    "latest_read_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "MeterSummary": {
+                "title": "Ringkasan meter",
+                "properties": {
+                    "meter_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "code": {
+                        "type": "string",
+                        "example": "AW9L-IRC38"
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Main Distribution Panel"
+                    },
+                    "location": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "multiplier": {
+                        "description": "Rasio CT yang diterapkan aplikasi ke stand yang dikirim.",
+                        "type": "number",
+                        "format": "float",
+                        "example": 1
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "active",
+                            "maintenance"
+                        ],
+                        "example": "active"
+                    },
+                    "connection_status": {
+                        "type": "string",
+                        "enum": [
+                            "online",
+                            "offline",
+                            "maintenance"
+                        ],
+                        "example": "online"
+                    },
+                    "last_seen_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "ErrorMessage": {
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "API token tidak valid. Kirim lewat header X-Api-Token."
+                    }
+                },
+                "type": "object"
+            },
+            "ValidationError": {
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "Payload tidak valid."
+                    },
+                    "errors": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "securitySchemes": {
+            "ApiToken": {
+                "type": "apiKey",
+                "description": "API token global dari menu Setting Aplikasi → Integrasi IoT.",
+                "name": "X-Api-Token",
+                "in": "header"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Meter Readings",
+            "description": "Pengiriman pembacaan power meter dari gateway IoT ke aplikasi."
+        }
+    ]
+}

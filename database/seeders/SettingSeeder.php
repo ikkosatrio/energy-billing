@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Setting;
 use App\Services\SettingService;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 /**
  * Nilai awal setting sistem. Aman dijalankan ulang: hanya membuat baris yang
@@ -57,6 +58,18 @@ class SettingSeeder extends Seeder
                 ['value' => $value, 'type' => $type, 'group' => $group, 'label' => $label],
             );
         }
+
+        // Token dibuat acak sekali saat instalasi, tidak di-hardcode di
+        // repository. Bisa dilihat dan digenerate ulang dari halaman Setting.
+        Setting::firstOrCreate(
+            ['key' => 'api_token'],
+            [
+                'value' => Str::random(48),
+                'type' => 'string',
+                'group' => 'iot',
+                'label' => 'API Token Gateway',
+            ],
+        );
 
         app(SettingService::class)->forget();
     }

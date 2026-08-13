@@ -4,7 +4,6 @@ namespace App\Livewire\Master;
 
 use App\Models\PowerMeter;
 use App\Services\ActivityLogger;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -22,12 +21,6 @@ class PowerMeterPage extends Component
     public bool $showForm = false;
 
     public array $form = [];
-
-    /**
-     * device_key hanya ditampilkan sekali, tepat setelah dibuat atau
-     * di-generate ulang — setelahnya tidak pernah ditampilkan lagi.
-     */
-    public ?string $revealedKey = null;
 
     public function mount(): void
     {
@@ -99,7 +92,6 @@ class PowerMeterPage extends Component
             'notes' => $meter->notes,
         ];
 
-        $this->revealedKey = null;
         $this->resetErrorBag();
         $this->showForm = true;
     }
@@ -115,37 +107,13 @@ class PowerMeterPage extends Component
             $meter->fill($data);
             ActivityLogger::logModelChange('updated', $meter, "Ubah power meter {$meter->code}");
             $meter->save();
-
-            $this->showForm = false;
         } else {
-            $key = $this->generateDeviceKey();
-            $meter = PowerMeter::create($data + ['device_key' => $key]);
+            $meter = PowerMeter::create($data);
             ActivityLogger::log('created', $meter, "Tambah power meter {$meter->code}");
-
-            // Form dibiarkan terbuka agar key sempat disalin operator.
-            $this->editingId = $meter->id;
-            $this->revealedKey = $key;
         }
 
-        $this->dispatch('toast', type: 'success', message: 'Data power meter tersimpan.');
-    }
-
-    /**
-     * Mengganti device_key, mis. saat token lama bocor. Gateway harus
-     * diperbarui setelah ini atau push-nya akan ditolak.
-     */
-    public function regenerateKey(int $id): void
-    {
-        $this->authorize('meter.update');
-
-        $meter = PowerMeter::findOrFail($id);
-        $key = $this->generateDeviceKey();
-
-        $meter->forceFill(['device_key' => $key])->save();
-        ActivityLogger::log('regenerate_key', $meter, "Generate ulang device key {$meter->code}");
-
-        $this->revealedKey = $key;
-        $this->dispatch('toast', type: 'warning', message: 'Device key baru dibuat. Perbarui konfigurasi gateway.');
+        $this->showForm = false;
+        $this->dispatch('toast', type: 'success', message: "Data power meter tersimpan. ID meter: {$meter->id}");
     }
 
     public function delete(int $id): void
@@ -172,15 +140,9 @@ class PowerMeterPage extends Component
         $this->dispatch('toast', type: 'success', message: 'Power meter dihapus.');
     }
 
-    private function generateDeviceKey(): string
-    {
-        return 'em_'.Str::random(48);
-    }
-
     private function resetForm(): void
     {
         $this->editingId = null;
-        $this->revealedKey = null;
         $this->form = [
             'code' => '',
             'name' => '',
@@ -214,6 +176,7 @@ class PowerMeterPage extends Component
         return view('livewire.master.power-meter-page', [
             'meters' => $meters,
             'ingestUrl' => url('/api/v1/readings'),
+            'docsUrl' => url('/api/documentation'),
         ]);
     }
 }

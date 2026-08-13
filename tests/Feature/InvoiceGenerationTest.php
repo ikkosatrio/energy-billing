@@ -36,7 +36,7 @@ class InvoiceGenerationTest extends TestCase
     {
         $meter = PowerMeter::create([
             'code' => 'MTR-01', 'name' => 'LVMDP 01', 'multiplier' => 1,
-            'device_key' => 'em_key', 'status' => 'active',
+            'status' => 'active',
         ]);
 
         $group = TariffGroup::create(['code' => 'I-3/TR', 'name' => 'I-3 / TR']);
@@ -209,7 +209,7 @@ class InvoiceGenerationTest extends TestCase
 
     public function test_pelanggan_tanpa_pembacaan_meter_ditagih_nol_dengan_catatan(): void
     {
-        $meter = PowerMeter::create(['code' => 'MTR-02', 'name' => 'B', 'multiplier' => 1, 'device_key' => 'em_b']);
+        $meter = PowerMeter::create(['code' => 'MTR-02', 'name' => 'B', 'multiplier' => 1]);
         $group = TariffGroup::create(['code' => 'B-3/TR', 'name' => 'B-3']);
         $group->rates()->create(['rate_lwbp' => 1000, 'rate_wbp' => 1400, 'effective_from' => '2026-01-01']);
 
@@ -227,7 +227,7 @@ class InvoiceGenerationTest extends TestCase
 
     public function test_meter_yang_direset_ditandai_dan_tidak_bernilai_negatif(): void
     {
-        $meter = PowerMeter::create(['code' => 'MTR-03', 'name' => 'C', 'multiplier' => 1, 'device_key' => 'em_c']);
+        $meter = PowerMeter::create(['code' => 'MTR-03', 'name' => 'C', 'multiplier' => 1]);
         $group = TariffGroup::create(['code' => 'B-3/TR', 'name' => 'B-3']);
         $group->rates()->create(['rate_lwbp' => 1000, 'rate_wbp' => 1400, 'effective_from' => '2026-01-01']);
 

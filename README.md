@@ -85,19 +85,49 @@ npm run tw:watch
 
 ## Endpoint gateway IoT
 
-Gateway mengirim pembacaan ke API dengan header `X-Device-Key` milik masing-masing
-meter. Device key dibuat otomatis saat perangkat ditambahkan dan hanya
-ditampilkan sekali — salin saat itu, atau generate ulang dari form perangkat.
+**Dokumentasi interaktif (Swagger UI): `/api/documentation`** — bisa dibuka dari
+menu Sistem → Dokumentasi API. Halaman ini berada di balik login aplikasi.
 
 ```
-POST /api/v1/readings
-GET  /api/v1/ping
+POST /api/v1/readings   Kirim pembacaan
+GET  /api/v1/meters     Daftar meter beserta ID-nya
+GET  /api/v1/ping       Cek token & interval push
 ```
 
-Payload tunggal:
+### Identifikasi meter
+
+Meter disebut lewat **`meter_id`** — ID numerik yang tampil di kolom pertama
+halaman **Power Meter Device** dan bisa dilihat kapan saja. Tidak ada rahasia
+per perangkat.
+
+`meter_id` dikirim **di dalam body JSON**, bukan sebagai parameter URL. Di
+Swagger UI: buka `POST /api/v1/readings` → **Try it out** → pilih contoh pada
+dropdown (*Kiriman tunggal* / *minimal* / *batch*), body langsung terisi dan
+tinggal dijalankan.
+
+### Autentikasi
+
+Seluruh gateway memakai satu API token global:
+
+```
+X-Api-Token: <token>
+```
+
+Token diatur di **Setting Aplikasi → Integrasi IoT**, terlihat permanen, bisa
+disalin dan digenerate ulang kapan saja. `Authorization: Bearer <token>` juga
+diterima.
+
+Mengosongkan token akan **mematikan autentikasi** — endpoint jadi terbuka.
+Karena data yang masuk situ langsung menentukan nominal tagihan, hanya lakukan
+itu bila server benar-benar tertutup di jaringan internal.
+
+### Payload
+
+Tunggal:
 
 ```json
 {
+  "meter_id": 1,
   "read_at": "2026-08-13T10:35:00+07:00",
   "stand_lwbp": 1270280.5,
   "stand_wbp": 414260.2,
@@ -109,15 +139,68 @@ Payload tunggal:
 }
 ```
 
-Batch (dipakai saat gateway mengirim buffer setelah offline, maksimal 1000 baris):
+Batch — dipakai saat gateway mengirim buffer setelah offline, maksimal 1000
+baris dan seluruhnya milik satu meter:
 
 ```json
-{ "readings": [ { "read_at": "…", "stand_lwbp": 1, "stand_wbp": 2 } ] }
+{
+  "meter_id": 1,
+  "readings": [
+    { "read_at": "2026-08-13T10:35:00+07:00", "stand_lwbp": 1270280.5, "stand_wbp": 414260.2 }
+  ]
+}
 ```
 
 `stand_lwbp` dan `stand_wbp` adalah **angka kumulatif meter**, bukan pemakaian.
 Pengiriman ulang untuk timestamp yang sama diabaikan, tidak menimpa dan tidak
 menggandakan.
+
+### Pilihan server di Swagger
+
+Dropdown **Servers** menentukan host yang ditembak tombol *Try it out*:
+
+| Entri | Asal |
+| ----- | ---- |
+| `/` — Server saat ini | Relatif; selalu mengikuti host yang membuka halaman docs, jadi benar di local, staging, maupun produksi tanpa konfigurasi |
+| Staging | `SWAGGER_SERVER_STAGING` di `.env` |
+| Produksi | `SWAGGER_SERVER_PRODUCTION` di `.env` |
+
+```dotenv
+SWAGGER_SERVER_STAGING=https://staging.perusahaan.co.id
+SWAGGER_SERVER_PRODUCTION=https://billing.perusahaan.co.id
+```
+
+Argumen atribut PHP harus berupa constant expression, jadi `env()` tidak bisa
+dipanggil langsung di `#[OA\Server]`. Nilainya dijembatani lewat kunci
+`constants` di [config/l5-swagger.php](config/l5-swagger.php) — tambah entri di
+sana bila perlu lingkungan lain (mis. DR atau demo).
+
+### Tampilan halaman dokumentasi
+
+Halaman Swagger memakai identitas aplikasi, bukan tampilan bawaan Swagger:
+header navy dengan logo dan nama dari **Setting Aplikasi**, palet dan font yang
+sama dengan aplikasi, serta tombol kembali ke dashboard.
+
+| Berkas | Peran |
+| ------ | ----- |
+| [resources/views/vendor/l5-swagger/index.blade.php](resources/views/vendor/l5-swagger/index.blade.php) | Header aplikasi, memuat font & stylesheet, `layout: BaseLayout` agar topbar bawaan tidak dirender |
+| [public/assets/css/swagger-theme.css](public/assets/css/swagger-theme.css) | Menerapkan token dari `app.css` ke selector Swagger UI |
+
+Logo dan nama ikut berubah otomatis saat diganti di menu Setting — tidak ada
+yang perlu di-hardcode.
+
+> Bila paket l5-swagger di-update dan view-nya di-publish ulang, penyesuaian di
+> `index.blade.php` akan tertimpa dan perlu diterapkan kembali.
+
+### Regenerasi dokumentasi
+
+```bash
+php artisan l5-swagger:generate
+```
+
+Wajib dijalankan ulang setiap anotasi atau URL server berubah. Saat development,
+set `L5_SWAGGER_GENERATE_ALWAYS=true` di `.env` agar menyesuaikan sendiri tiap
+request.
 
 ## Perintah terjadwal
 
@@ -163,10 +246,14 @@ mengunci paket yang tidak bisa dipasang di dalam container.
   in default email rule*. Sebagai penambal sementara, seluruh field email
   memakai aturan `email:filter` (FILTER_VALIDATE_EMAIL) yang menolak CRLF.
   **Upgrade ke Laravel 12 disarankan** sebelum aplikasi dipakai di produksi.
-- `power_meters.device_key` disimpan sebagai teks biasa (bukan hash) agar
-  lookup-nya satu query dan integrasi gateway mudah di-debug. Key hanya
-  memberi izin mengirim pembacaan untuk satu meter, tidak ada akses baca.
-  Bila database bocor, generate ulang key seluruh perangkat.
+- **API token gateway bersifat global dan disimpan sebagai teks biasa** di tabel
+  `settings`, supaya bisa dilihat dan disalin kapan saja dari halaman Setting.
+  Konsekuensinya: satu token bocor berarti seluruh gateway harus dikonfigurasi
+  ulang, dan token tidak membatasi meter mana yang boleh dikirimi data — siapa
+  pun yang memegangnya bisa mengirim untuk `meter_id` mana saja. Generate ulang
+  token bila ada kecurigaan kebocoran.
+- Endpoint ingest menentukan angka tagihan. Jalankan aplikasi di belakang HTTPS
+  agar token tidak terbaca di jaringan.
 
 ## Referensi desain
 

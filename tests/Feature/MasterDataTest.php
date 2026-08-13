@@ -40,9 +40,9 @@ class MasterDataTest extends TestCase
         ]);
     }
 
-    public function test_power_meter_dibuat_dengan_device_key_yang_ditampilkan_sekali(): void
+    public function test_power_meter_dibuat_tanpa_rahasia_per_perangkat(): void
     {
-        $component = Livewire::test(PowerMeterPage::class)
+        Livewire::test(PowerMeterPage::class)
             ->call('create')
             ->set('form.code', 'MTR-01')
             ->set('form.name', 'LVMDP 01')
@@ -54,13 +54,14 @@ class MasterDataTest extends TestCase
         $meter = PowerMeter::first();
 
         $this->assertSame('MTR-01', $meter->code);
-        $this->assertStringStartsWith('em_', $meter->device_key);
-        $this->assertSame($meter->device_key, $component->get('revealedKey'));
+        // ID inilah yang dipakai gateway sebagai meter_id, dan selalu terlihat.
+        $this->assertNotNull($meter->id);
+        $this->assertArrayNotHasKey('device_key', $meter->getAttributes());
     }
 
     public function test_kode_meter_tidak_boleh_duplikat(): void
     {
-        PowerMeter::create(['code' => 'MTR-01', 'name' => 'A', 'multiplier' => 1, 'device_key' => 'em_a']);
+        PowerMeter::create(['code' => 'MTR-01', 'name' => 'A', 'multiplier' => 1]);
 
         Livewire::test(PowerMeterPage::class)
             ->call('create')
@@ -74,7 +75,7 @@ class MasterDataTest extends TestCase
 
     public function test_satu_meter_tidak_bisa_dipakai_dua_pelanggan(): void
     {
-        $meter = PowerMeter::create(['code' => 'MTR-01', 'name' => 'A', 'multiplier' => 1, 'device_key' => 'em_a']);
+        $meter = PowerMeter::create(['code' => 'MTR-01', 'name' => 'A', 'multiplier' => 1]);
         $group = TariffGroup::create(['code' => 'I-3/TR', 'name' => 'I-3']);
 
         Customer::create([
@@ -181,7 +182,7 @@ class MasterDataTest extends TestCase
 
     public function test_jadwal_wbp_lwbp_tersimpan_dan_tersambung(): void
     {
-        $meter = PowerMeter::create(['code' => 'MTR-01', 'name' => 'A', 'multiplier' => 1, 'device_key' => 'em_a']);
+        $meter = PowerMeter::create(['code' => 'MTR-01', 'name' => 'A', 'multiplier' => 1]);
 
         Livewire::test(TariffSchedulePage::class)
             ->set('meterId', $meter->id)
@@ -203,7 +204,7 @@ class MasterDataTest extends TestCase
 
     public function test_jadwal_tidak_valid_tidak_tersimpan(): void
     {
-        $meter = PowerMeter::create(['code' => 'MTR-01', 'name' => 'A', 'multiplier' => 1, 'device_key' => 'em_a']);
+        $meter = PowerMeter::create(['code' => 'MTR-01', 'name' => 'A', 'multiplier' => 1]);
 
         Livewire::test(TariffSchedulePage::class)
             ->set('meterId', $meter->id)

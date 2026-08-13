@@ -5,6 +5,7 @@ namespace App\Livewire\System;
 use App\Models\Setting;
 use App\Services\ActivityLogger;
 use App\Services\SettingService;
+use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
@@ -47,6 +48,9 @@ class SettingPage extends Component
             'values.iot_push_interval_seconds' => ['required', 'integer', 'min:1'],
             'values.iot_offline_after_minutes' => ['required', 'integer', 'min:1'],
             'values.iot_retention_months' => ['required', 'integer', 'min:1'],
+            // Boleh dikosongkan untuk mematikan autentikasi API; peringatannya
+            // ditampilkan di halaman Setting.
+            'values.api_token' => ['nullable', 'string', 'min:24', 'max:128'],
 
             'logo' => ['nullable', 'image', 'max:2048'],
         ];
@@ -66,7 +70,22 @@ class SettingPage extends Component
             'values.ppj_percent' => 'PPJ',
             'values.ppn_percent' => 'PPN',
             'values.invoice_rounding_to' => 'pembulatan total',
+            'values.api_token' => 'API token',
         ];
+    }
+
+    /**
+     * Membuat token baru. Gateway harus diperbarui setelah ini, atau
+     * kiriman datanya akan ditolak.
+     */
+    public function regenerateToken(): void
+    {
+        $this->authorize('setting.manage');
+
+        $this->values['api_token'] = Str::random(48);
+
+        $this->dispatch('toast', type: 'warning',
+            message: 'Token baru dibuat. Klik Simpan lalu perbarui konfigurasi gateway.');
     }
 
     protected function messages(): array
@@ -103,6 +122,8 @@ class SettingPage extends Component
     {
         return view('livewire.system.setting-page', [
             'groups' => Setting::orderBy('id')->get()->groupBy('group'),
+            'ingestUrl' => url('/api/v1/readings'),
+            'docsUrl' => url('/api/documentation'),
         ]);
     }
 }

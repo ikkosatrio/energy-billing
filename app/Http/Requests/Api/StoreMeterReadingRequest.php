@@ -7,13 +7,16 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
 /**
- * Menerima satu pembacaan maupun kiriman batch.
+ * Menerima satu pembacaan maupun kiriman batch untuk SATU meter.
+ *
+ * Meter ditentukan oleh `meter_id` di tingkat atas payload. Nilainya adalah ID
+ * yang tampil di halaman Power Meter dan bisa dilihat kapan saja.
  *
  * Batch penting karena gateway menyimpan data saat jaringan putus lalu
  * mengirimnya sekaligus ketika kembali online.
  *
- *   { "read_at": "...", "stand_lwbp": 1, "stand_wbp": 2 }
- *   { "readings": [ {...}, {...} ] }
+ *   { "meter_id": 1, "read_at": "...", "stand_lwbp": 1, "stand_wbp": 2 }
+ *   { "meter_id": 1, "readings": [ {...}, {...} ] }
  */
 class StoreMeterReadingRequest extends FormRequest
 {
@@ -22,7 +25,7 @@ class StoreMeterReadingRequest extends FormRequest
 
     public function authorize(): bool
     {
-        // Otorisasi ditangani middleware AuthenticateDevice.
+        // Autentikasi ditangani middleware AuthenticateGateway.
         return true;
     }
 
@@ -33,13 +36,18 @@ class StoreMeterReadingRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         if (!$this->has('readings')) {
-            $this->merge(['readings' => [$this->all()]]);
+            $this->merge([
+                'readings' => [$this->except('meter_id')],
+            ]);
         }
     }
 
     public function rules(): array
     {
         return [
+            // Meter nonaktif tidak boleh lagi menerima data; ini divalidasi di
+            // sini agar gateway mendapat 422 dengan pesan yang jelas.
+            'meter_id' => ['required', 'integer', 'exists:power_meters,id'],
             'readings' => ['required', 'array', 'min:1', 'max:'.self::MAX_BATCH],
             'readings.*.read_at' => ['required', 'date'],
             'readings.*.stand_lwbp' => ['required', 'numeric', 'min:0'],
@@ -59,6 +67,8 @@ class StoreMeterReadingRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'meter_id.required' => 'meter_id wajib diisi — lihat ID meter di halaman Power Meter Device.',
+            'meter_id.exists' => 'meter_id tidak ditemukan.',
             'readings.max' => 'Maksimal '.self::MAX_BATCH.' pembacaan per kiriman.',
             'readings.*.stand_lwbp.required' => 'stand_lwbp wajib diisi (angka kumulatif meter).',
             'readings.*.stand_wbp.required' => 'stand_wbp wajib diisi (angka kumulatif meter).',

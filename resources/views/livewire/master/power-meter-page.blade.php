@@ -27,12 +27,20 @@
         </div>
     </div>
 
+    <div class="alert alert-info mb-18">
+        Kolom <strong>ID Meter</strong> di bawah adalah nilai yang dikirim gateway sebagai
+        <span class="mono">meter_id</span> ke <span class="mono">{{ $ingestUrl }}</span>.
+        Nilainya tetap dan bisa dilihat kapan saja.
+        <a href="{{ $docsUrl }}" target="_blank">Buka dokumentasi API →</a>
+    </div>
+
     {{-- ── Tabel ───────────────────────────────────────────────────────── --}}
     <div class="card">
         <div class="table-wrap">
             <table class="table">
                 <thead>
                     <tr>
+                        <th class="num" style="width:80px">ID Meter</th>
                         <th>Nama / Kode</th>
                         <th>Tipe</th>
                         <th>Lokasi</th>
@@ -55,6 +63,7 @@
                             $reading = $meter->latestReading;
                         @endphp
                         <tr>
+                            <td class="num strong" style="font-size:15px">{{ $meter->id }}</td>
                             <td class="strong">
                                 {{ $meter->name }}
                                 <div class="sub mono">{{ $meter->code }}</div>
@@ -83,7 +92,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="table-empty">
+                            <td colspan="9" class="table-empty">
                                 {{ $search || $statusFilter ? 'Tidak ada perangkat yang cocok dengan filter.' : 'Belum ada power meter. Tambahkan lewat tombol di atas.' }}
                             </td>
                         </tr>
@@ -104,21 +113,11 @@
                 <div class="card-head" style="margin-bottom:20px">
                     <div>
                         <div class="card-title">{{ $editingId ? 'Ubah Perangkat' : 'Tambah Perangkat' }}</div>
-                        <div class="card-sub">Perangkat mengirim pembacaan ke aplikasi lewat REST API</div>
+                        <div class="card-sub">ID meter dibuat otomatis setelah disimpan dan dipakai gateway sebagai <span class="mono">meter_id</span></div>
                     </div>
                     <button type="button" class="btn btn-ghost" wire:click="$set('showForm', false)">Tutup</button>
                 </div>
 
-                @if ($revealedKey)
-                    <div class="alert alert-warning" style="margin-bottom:18px">
-                        <strong>Device key — salin sekarang, tidak akan ditampilkan lagi.</strong>
-                        <div class="mono" style="margin-top:8px;word-break:break-all;font-size:12px">{{ $revealedKey }}</div>
-                        <div style="margin-top:10px">
-                            Gateway mengirim POST ke <span class="mono">{{ $ingestUrl }}</span>
-                            dengan header <span class="mono">X-Device-Key</span> berisi nilai di atas.
-                        </div>
-                    </div>
-                @endif
 
                 <form wire:submit="save">
                     <div class="form-grid form-grid-2">
@@ -198,17 +197,6 @@
                             <span wire:loading wire:target="save">Menyimpan…</span>
                         </button>
                         <button type="button" class="btn btn-outline" wire:click="$set('showForm', false)">Batal</button>
-
-                        @if ($editingId)
-                            @can('meter.update')
-                                <button type="button" class="btn btn-ghost" style="margin-left:auto"
-                                        wire:click="regenerateKey({{ $editingId }})"
-                                        wire:confirm="Buat device key baru? Gateway harus dikonfigurasi ulang atau datanya akan ditolak.">
-                                    <i data-lucide="key-round" style="width:15px;height:15px"></i>
-                                    Generate Ulang Device Key
-                                </button>
-                            @endcan
-                        @endif
                     </div>
                 </form>
             </div>

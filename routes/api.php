@@ -11,11 +11,16 @@ use Illuminate\Support\Facades\Route;
 | Endpoint yang dikonsumsi gateway IoT. Diletakkan di sini (bukan web.php)
 | supaya tidak melewati middleware session/CSRF.
 |
-| Autentikasi memakai header X-Device-Key milik masing-masing power meter.
+| Meter ditentukan lewat `meter_id` pada payload — ID yang tampil di halaman
+| Power Meter Device. Autentikasi memakai satu API token global dari setting
+| sistem, dikirim lewat header X-Api-Token.
+|
+| Dokumentasi interaktif: /api/documentation
 |
 */
 
-Route::prefix('v1')->name('api.v1.')->middleware('device')->group(function () {
+Route::prefix('v1')->name('api.v1.')->middleware('gateway')->group(function () {
     Route::get('ping', [MeterReadingController::class, 'ping'])->name('ping');
+    Route::get('meters', [MeterReadingController::class, 'meters'])->name('meters.index');
     Route::post('readings', [MeterReadingController::class, 'store'])->name('readings.store');
 });

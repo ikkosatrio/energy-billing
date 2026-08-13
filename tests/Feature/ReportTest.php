@@ -38,7 +38,7 @@ class ReportTest extends TestCase
     {
         $meter = PowerMeter::create([
             'code' => "MTR-{$code}", 'name' => "Panel {$code}", 'multiplier' => 1,
-            'device_key' => 'em_'.$code, 'status' => 'active',
+            'status' => 'active',
         ]);
 
         if ($withReadings) {

@@ -175,6 +175,15 @@ return [
                 'icon' => 'history',
                 'permits' => ['activity_log.view'],
             ],
+            [
+                'title' => 'Dokumentasi API',
+                'route' => 'l5-swagger.default.api',
+                'icon' => 'book-open',
+                'permits' => [],
+                // Swagger UI adalah halaman terpisah, bukan bagian layout
+                // aplikasi — dibuka di tab baru.
+                'external' => true,
+            ],
         ],
     ],
 

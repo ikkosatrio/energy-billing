@@ -5,8 +5,13 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Perangkat power meter di lapangan. Gateway mengirim pembacaan ke endpoint
- * API dengan `device_key` sebagai token identifikasi perangkat.
+ * Perangkat power meter di lapangan.
+ *
+ * CATATAN: kolom `device_key` di bawah sudah dihapus oleh migrasi
+ * 2026_01_02_000001. Gateway kini mengidentifikasi meter lewat `meter_id`
+ * biasa dan diautentikasi oleh satu API token global di setting sistem.
+ * Definisi ini dipertahankan apa adanya karena migrasi bersifat catatan
+ * berurutan — jangan diubah, cukup baca migrasi berikutnya.
  */
 return new class extends Migration
 {

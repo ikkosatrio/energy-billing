@@ -62,11 +62,21 @@
 
                         <div class="sidebar-sub">
                             @foreach ($items as $item)
-                                <a href="{{ route($item['route']) }}" wire:navigate
-                                   class="sidebar-sublink{{ $isActive($item) ? ' active' : '' }}">
-                                    <span class="sidebar-dot"></span>
-                                    <span>{{ $item['title'] }}</span>
-                                </a>
+                                @if ($item['external'] ?? false)
+                                    {{-- Halaman di luar layout aplikasi (mis. Swagger UI):
+                                         buka di tab baru, jangan lewat wire:navigate. --}}
+                                    <a href="{{ route($item['route']) }}" target="_blank" class="sidebar-sublink">
+                                        <span class="sidebar-dot"></span>
+                                        <span>{{ $item['title'] }}</span>
+                                        <i data-lucide="external-link" style="width:12px;height:12px;opacity:.5"></i>
+                                    </a>
+                                @else
+                                    <a href="{{ route($item['route']) }}" wire:navigate
+                                       class="sidebar-sublink{{ $isActive($item) ? ' active' : '' }}">
+                                        <span class="sidebar-dot"></span>
+                                        <span>{{ $item['title'] }}</span>
+                                    </a>
+                                @endif
                             @endforeach
                         </div>
                     </details>

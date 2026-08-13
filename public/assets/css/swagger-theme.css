@@ -1,0 +1,321 @@
+/* ==========================================================================
+   Swagger UI — disesuaikan dengan design system Energy Billing.
+
+   Swagger UI menyuntikkan CSS-nya sendiri dengan spesifisitas cukup tinggi,
+   jadi sebagian besar aturan di sini perlu prefiks `.swagger-ui` dan beberapa
+   memakai !important. Token warnanya diambil dari app.css agar dokumentasi
+   dan aplikasi tidak pernah berbeda palet.
+   ========================================================================== */
+
+/* Swagger UI v5 punya media query prefers-color-scheme; aplikasi ini hanya
+   punya tampilan terang, jadi skema dikunci supaya keduanya konsisten. */
+:root { color-scheme: light; }
+
+body {
+  margin: 0;
+  background: var(--bg-page);
+  font-family: var(--font-sans);
+}
+
+/* ── Header aplikasi ──────────────────────────────────────────────────── */
+
+.docs-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 28px;
+  background: linear-gradient(180deg, var(--sidebar-from) 0%, var(--sidebar-mid) 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, .07);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+
+.docs-header .mark {
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sidebar-from);
+  box-shadow: 0 6px 18px rgba(245, 158, 11, .32);
+  overflow: hidden;
+}
+.docs-header .mark img { width: 100%; height: 100%; object-fit: cover; }
+.docs-header .mark svg { width: 20px; height: 20px; }
+
+.docs-header .name {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  color: #fff;
+  text-transform: uppercase;
+}
+.docs-header .sub {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: .06em;
+  margin-top: 2px;
+}
+
+.docs-header .back {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  background: rgba(255, 255, 255, .05);
+  color: #cbd5e1;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background .16s ease, color .16s ease;
+}
+.docs-header .back:hover { background: rgba(255, 255, 255, .1); color: #fff; }
+
+/* Topbar bawaan Swagger (logo + kolom URL) diganti header di atas. */
+.swagger-ui .topbar { display: none; }
+
+/* ── Tipografi & warna dasar ──────────────────────────────────────────── */
+
+.swagger-ui { font-family: var(--font-sans); color: var(--text); }
+
+.swagger-ui .wrapper { max-width: 1180px; padding: 0 28px; }
+
+.swagger-ui .info { margin: 30px 0 24px; }
+.swagger-ui .info .title {
+  font-family: var(--font-sans);
+  font-weight: 800;
+  letter-spacing: -.02em;
+  color: var(--text);
+}
+.swagger-ui .info .title small.version-stamp { background: var(--primary); }
+.swagger-ui .info .title small {
+  background: var(--neutral-bg);
+  border-radius: 20px;
+}
+.swagger-ui .info li,
+.swagger-ui .info p,
+.swagger-ui .info table { color: var(--text-body); font-size: 14px; }
+.swagger-ui .info h1, .swagger-ui .info h2,
+.swagger-ui .info h3, .swagger-ui .info h4 {
+  font-family: var(--font-sans);
+  font-weight: 800;
+  color: var(--text);
+}
+.swagger-ui .info a { color: var(--primary); }
+.swagger-ui .info code,
+.swagger-ui .renderedMarkdown code {
+  font-family: var(--font-mono);
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+.swagger-ui .info pre {
+  background: var(--sidebar-from);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+.swagger-ui .info pre code { background: transparent; color: #e2e8f0; }
+
+/* ── Kotak server & tombol Authorize ──────────────────────────────────── */
+
+.swagger-ui .scheme-container {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 18px 20px;
+  margin: 0 0 24px;
+}
+.swagger-ui .servers-title { font-weight: 700; color: var(--text); }
+
+.swagger-ui .btn.authorize {
+  border-color: var(--primary);
+  color: var(--primary);
+  border-radius: 10px;
+  font-family: var(--font-sans);
+  font-weight: 700;
+}
+.swagger-ui .btn.authorize svg { fill: var(--primary); }
+.swagger-ui .btn.authorize:hover { background: var(--primary-soft); }
+
+/* ── Grup & operasi ───────────────────────────────────────────────────── */
+
+.swagger-ui .opblock-tag {
+  font-family: var(--font-sans);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 0;
+}
+.swagger-ui .opblock-tag small { color: var(--text-muted); font-weight: 500; }
+
+.swagger-ui .opblock {
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  margin: 0 0 14px;
+  /* Header aplikasi bersifat sticky; tanpa ini tautan deep-link ke sebuah
+     operasi akan berhenti tepat di bawahnya dan tertutup. */
+  scroll-margin-top: 86px;
+}
+.swagger-ui .opblock-tag { scroll-margin-top: 86px; }
+.swagger-ui .opblock .opblock-summary { border-bottom: 0; padding: 6px 10px; }
+.swagger-ui .opblock .opblock-summary-method {
+  font-family: var(--font-sans);
+  font-weight: 800;
+  border-radius: 8px;
+  min-width: 84px;
+  text-shadow: none;
+}
+.swagger-ui .opblock .opblock-summary-path,
+.swagger-ui .opblock .opblock-summary-path__deprecated {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text);
+}
+.swagger-ui .opblock .opblock-summary-description {
+  font-family: var(--font-sans);
+  color: var(--text-muted);
+}
+
+/* Warna metode diselaraskan dengan palet aplikasi. */
+.swagger-ui .opblock.opblock-post {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+.swagger-ui .opblock.opblock-post .opblock-summary-method { background: var(--success); }
+.swagger-ui .opblock.opblock-get {
+  background: var(--primary-soft);
+  border-color: #bfdbfe;
+}
+.swagger-ui .opblock.opblock-get .opblock-summary-method { background: var(--primary); }
+
+.swagger-ui .opblock .opblock-section-header {
+  background: var(--bg-subtle);
+  box-shadow: none;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+}
+.swagger-ui .opblock .opblock-section-header h4,
+.swagger-ui .opblock-title_normal h4,
+.swagger-ui .tab li { font-family: var(--font-sans); color: var(--text); }
+
+/* ── Tombol ───────────────────────────────────────────────────────────── */
+
+.swagger-ui .btn {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  border-radius: 10px;
+  box-shadow: none;
+}
+.swagger-ui .btn.try-out__btn {
+  border-color: #dbe3ee;
+  color: #334155;
+  background: var(--bg-card);
+}
+.swagger-ui .btn.try-out__btn:hover { border-color: var(--primary); color: var(--primary); }
+
+.swagger-ui .btn.execute {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, .26);
+}
+.swagger-ui .btn.cancel { border-color: #fca5a5; color: var(--danger-fg); }
+
+/* ── Input & tabel ────────────────────────────────────────────────────── */
+
+.swagger-ui select,
+.swagger-ui input[type=text],
+.swagger-ui input[type=password],
+.swagger-ui input[type=search],
+.swagger-ui input[type=email],
+.swagger-ui textarea {
+  font-family: var(--font-sans);
+  border: 1px solid #dbe3ee;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text);
+  box-shadow: none;
+}
+.swagger-ui textarea { font-family: var(--font-mono); font-size: 12.5px; }
+.swagger-ui select:focus,
+.swagger-ui input:focus,
+.swagger-ui textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+}
+.swagger-ui .operation-filter-input { border-radius: var(--radius-sm); }
+
+.swagger-ui table thead tr td,
+.swagger-ui table thead tr th {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border);
+}
+.swagger-ui .parameter__name {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  color: var(--text);
+}
+.swagger-ui .parameter__type,
+.swagger-ui .prop-type {
+  font-family: var(--font-mono);
+  color: var(--primary-dark);
+}
+.swagger-ui .parameter__in { font-family: var(--font-mono); color: var(--text-faint); }
+
+/* ── Blok contoh & model ──────────────────────────────────────────────── */
+
+.swagger-ui .highlight-code > .microlight,
+.swagger-ui .model-example .microlight {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  border-radius: var(--radius-sm);
+}
+.swagger-ui .model-box { background: var(--bg-subtle); border-radius: var(--radius-sm); }
+.swagger-ui .model-title { font-family: var(--font-sans); color: var(--text-body); }
+.swagger-ui section.models {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+}
+.swagger-ui section.models.is-open h4 { border-bottom: 1px solid var(--border); }
+.swagger-ui section.models h4 { font-family: var(--font-sans); color: var(--text); }
+
+.swagger-ui .response-col_status { font-family: var(--font-mono); color: var(--text); }
+.swagger-ui .responses-inner h4,
+.swagger-ui .responses-inner h5 { font-family: var(--font-sans); color: var(--text); }
+
+/* ── Dialog Authorize ─────────────────────────────────────────────────── */
+
+.swagger-ui .dialog-ux .modal-ux {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+}
+.swagger-ui .dialog-ux .modal-ux-header h3,
+.swagger-ui .dialog-ux .modal-ux-content h4 { font-family: var(--font-sans); color: var(--text); }
+.swagger-ui .dialog-ux .backdrop-ux { background: rgba(13, 27, 46, .55); }
+
+/* ── Responsive ───────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .docs-header { padding: 14px 18px; }
+  .docs-header .back span { display: none; }
+  .swagger-ui .wrapper { padding: 0 16px; }
+}

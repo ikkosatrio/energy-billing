@@ -152,6 +152,39 @@
                     <div class="card-title" style="margin-bottom:16px">Integrasi IoT</div>
 
                     <div class="field">
+                        <label class="field-label">API Token Gateway</label>
+                        <input type="text" readonly
+                               class="input mono @error('values.api_token') is-invalid @enderror"
+                               style="background:var(--bg-subtle)"
+                               wire:model="values.api_token"
+                               onclick="this.select()">
+                        @error('values.api_token') <div class="field-error">{{ $message }}</div> @enderror
+                        <div class="card-sub">
+                            Dipakai seluruh gateway lewat header <span class="mono">X-Api-Token</span>.
+                            Klik untuk menyalin. Token ini tetap terlihat kapan saja — tidak disembunyikan
+                            setelah dibuat.
+                        </div>
+
+                        @can('setting.manage')
+                            <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px"
+                                    wire:click="regenerateToken"
+                                    wire:confirm="Buat token baru? Seluruh gateway harus dikonfigurasi ulang atau kirimannya akan ditolak.">
+                                <i data-lucide="key-round" style="width:14px;height:14px"></i>
+                                Generate Token Baru
+                            </button>
+                        @endcan
+
+                        @if (blank($values['api_token'] ?? null))
+                            <div class="alert alert-danger" style="margin-top:12px">
+                                <strong>Token kosong — endpoint terbuka tanpa autentikasi.</strong>
+                                Siapa pun yang bisa menjangkau server dapat mengirim stand kWh palsu dan
+                                mengubah tagihan pelanggan. Hanya biarkan kosong bila server benar-benar
+                                tertutup di jaringan internal.
+                            </div>
+                        @endif
+                    </div>
+
+                    <div class="field">
                         <label class="field-label">Interval Push Gateway (detik) <span style="color:var(--danger)">*</span></label>
                         <input type="number" min="1" class="input mono @error('values.iot_push_interval_seconds') is-invalid @enderror"
                                wire:model="values.iot_push_interval_seconds">
@@ -177,8 +210,10 @@
                     </div>
 
                     <div class="alert alert-info" style="margin-top:14px">
-                        Gateway mengirim data ke <span class="mono">{{ url('/api/v1/readings') }}</span>
-                        dengan header <span class="mono">X-Device-Key</span> milik masing-masing meter.
+                        Gateway mengirim data ke <span class="mono">{{ $ingestUrl }}</span>
+                        dengan <span class="mono">meter_id</span> pada payload — ID-nya terlihat di
+                        halaman Power Meter Device.
+                        <a href="{{ $docsUrl }}" target="_blank">Buka dokumentasi API →</a>
                     </div>
                 </div>
             </div>

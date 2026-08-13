@@ -80,7 +80,6 @@ class DemoDataSeeder extends Seeder
                 'brand' => $brand,
                 'model' => $model,
                 'location' => $location,
-                'device_key' => 'em_'.Str::random(48),
                 'ct_ratio' => $kva > 500 ? '800/5' : '400/5',
                 'multiplier' => 1,
                 // Satu meter sengaja dibiarkan offline agar tampilan status
