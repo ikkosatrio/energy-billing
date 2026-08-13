@@ -1,34 +1,83 @@
-version: '3.8'
-
 # Energy Billing — single instance.
 # Laravel Octane di atas FrankenPHP: satu binary (Caddy + PHP) melayani
 # static asset sekaligus menjalankan Laravel, listen di port 80 container.
+#
+# Tiga service dari image yang sama:
+#   app        Octane/FrankenPHP melayani HTTP
+#   scheduler  memicu perintah terjadwal tiap menit (agregasi, generate invoice)
+#   queue      memproses job antrean (pengiriman email invoice)
+#
+# Scheduler dipisah dari `app` karena Octane menjalankan banyak worker HTTP;
+# menaruh scheduler di dalamnya membuat perintah terjadwal ikut tereksekusi
+# sebanyak jumlah worker.
+#
+# KETIGANYA harus berada di app-network: scheduler dan queue mengakses database
+# yang sama seperti app. Tanpa itu keduanya hidup tapi setiap perintahnya gagal
+# menyambung ke DB.
+
 networks:
   app-network:
     external: true
 
+x-app: &app
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: energy-billing:latest
+  restart: unless-stopped
+  working_dir: /app
+  env_file:
+    - .env
+  networks:
+    - app-network
+  volumes:
+    # Hanya storage yang dibagi antar container — di situ ada bukti transfer,
+    # log, dan berkas upload yang harus terlihat oleh ketiganya.
+    #
+    # bootstrap/cache sengaja TIDAK dibagi: isinya state hasil kompilasi milik
+    # masing-masing container, dan entrypoint menghapusnya saat start. Bila
+    # dibagi, container yang baru menyala akan menghapus cache yang sedang
+    # dipakai container lain.
+    - app-storage:/app/storage
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    <<: *app
     container_name: energy-billing
-    restart: unless-stopped
-    working_dir: /app
-    env_file:
-      - .env
     ports:
       - "${APP_PORT:-8000}:80"
     volumes:
       - app-storage:/app/storage
       - app-cache:/app/bootstrap/cache
-    networks:
-      - app-network
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+
+  scheduler:
+    <<: *app
+    container_name: energy-billing-scheduler
+    # PENTING: hanya boleh ada SATU container scheduler. Menjalankan dua
+    # membuat invoice digenerate dua kali pada tanggal cut-off yang sama.
+    # Pengaman terakhirnya ada di database — unique (billing_period_id,
+    # customer_id) pada tabel invoices — tapi jangan diandalkan.
+    #
+    # schedule:work adalah proses yang hidup terus dan memanggil schedule:run
+    # tiap menit, jadi tidak perlu cron di dalam image.
+    command: ["php", "artisan", "schedule:work"]
+    depends_on:
+      - app
+
+  queue:
+    <<: *app
+    container_name: energy-billing-queue
+    # --tries=3 memberi kesempatan ulang saat SMTP sedang tidak responsif;
+    # kegagalan setelah itu tercatat di tabel failed_jobs.
+    # --max-time merecycle worker tiap jam agar kebocoran memori tidak menumpuk.
+    command: ["php", "artisan", "queue:work", "--tries=3", "--max-time=3600", "--sleep=3"]
+    depends_on:
+      - app
 
 volumes:
   app-storage:

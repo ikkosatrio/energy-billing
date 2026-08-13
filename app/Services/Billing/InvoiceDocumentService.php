@@ -34,8 +34,13 @@ class InvoiceDocumentService
 
     /**
      * Mengirim invoice ke email pelanggan beserta lampiran PDF.
+     *
+     * $queue = true menaruhnya di antrean (dipakai pengiriman otomatis saat
+     * generate, agar satu SMTP yang lambat tidak menahan seluruh proses).
+     * Tombol manual memakai pengiriman langsung supaya operator segera tahu
+     * bila alamatnya salah atau SMTP menolak.
      */
-    public function email(Invoice $invoice): void
+    public function email(Invoice $invoice, bool $queue = false): void
     {
         $email = $invoice->customer?->email;
 
@@ -43,7 +48,13 @@ class InvoiceDocumentService
             throw new \RuntimeException('Pelanggan belum punya alamat email.');
         }
 
-        Mail::to($email)->send(new InvoiceMail($invoice, $this));
+        $mailer = Mail::to($email);
+        $mailable = new InvoiceMail($invoice, $this);
+
+        // Saat di-queue, sent_at menandai waktu masuk antrean — bukan waktu
+        // email benar-benar terkirim. Kegagalan setelahnya muncul di tabel
+        // failed_jobs, bukan di kolom ini.
+        $queue ? $mailer->queue($mailable) : $mailer->send($mailable);
 
         $invoice->forceFill([
             'sent_at' => now(),

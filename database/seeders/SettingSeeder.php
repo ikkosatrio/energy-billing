@@ -44,6 +44,11 @@ class SettingSeeder extends Seeder
         // Total dibulatkan ke kelipatan ini; 0 = tanpa pembulatan.
         ['invoice_rounding_to', '100', 'number', 'billing', 'Pembulatan Total (Rp)'],
 
+        // Default mati: invoice hasil generate otomatis berhenti sebagai draft
+        // supaya sempat diperiksa sebelum ditagihkan ke pelanggan.
+        ['invoice_auto_issue', '0', 'boolean', 'billing', 'Terbitkan Invoice Otomatis'],
+        ['invoice_auto_send', '0', 'boolean', 'billing', 'Kirim Email Otomatis'],
+
         // --- Integrasi IoT ---
         ['iot_push_interval_seconds', '60', 'number', 'iot', 'Interval Push Gateway (detik)'],
         ['iot_offline_after_minutes', '5', 'number', 'iot', 'Meter Offline Setelah (menit)'],

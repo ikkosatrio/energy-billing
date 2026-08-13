@@ -26,6 +26,12 @@ class SettingPage extends Component
     private function loadValues(): void
     {
         $this->values = Setting::pluck('value', 'key')->all();
+
+        // Nilai boolean disimpan sebagai '0'/'1'; checkbox Livewire perlu bool
+        // asli, kalau tidak '0' terbaca truthy dan centangnya selalu menyala.
+        foreach (Setting::where('type', 'boolean')->pluck('key') as $key) {
+            $this->values[$key] = filter_var($this->values[$key] ?? false, FILTER_VALIDATE_BOOLEAN);
+        }
     }
 
     protected function rules(): array
@@ -44,6 +50,8 @@ class SettingPage extends Component
             'values.ppj_percent' => ['required', 'numeric', 'between:0,100'],
             'values.ppn_percent' => ['required', 'numeric', 'between:0,100'],
             'values.invoice_rounding_to' => ['required', 'integer', 'min:0'],
+            'values.invoice_auto_issue' => ['boolean'],
+            'values.invoice_auto_send' => ['boolean'],
 
             'values.iot_push_interval_seconds' => ['required', 'integer', 'min:1'],
             'values.iot_offline_after_minutes' => ['required', 'integer', 'min:1'],

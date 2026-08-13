@@ -145,6 +145,42 @@
                             <div class="card-sub">Isi 0 bila tagihan tidak dikenakan PPN.</div>
                         </div>
                     </div>
+
+                    {{-- ── Otomatisasi ─────────────────────────────────── --}}
+                    <div style="margin-top:20px;padding-top:18px;border-top:1px solid var(--border-soft)">
+                        <div class="field-label" style="margin-bottom:10px">Otomatisasi</div>
+
+                        <label class="checkbox-row" style="margin:0">
+                            <input type="checkbox" wire:model.live="values.invoice_auto_issue">
+                            <span>Terbitkan invoice otomatis setelah digenerate</span>
+                        </label>
+                        <div class="card-sub" style="margin-left:23px">
+                            Tanpa ini, invoice hasil generate berhenti sebagai draft sampai diterbitkan manual.
+                        </div>
+
+                        <label class="checkbox-row" style="margin-top:12px">
+                            <input type="checkbox" wire:model.live="values.invoice_auto_send"
+                                   @disabled(!($values['invoice_auto_issue'] ?? false))>
+                            <span>Kirim email ke pelanggan setelah terbit</span>
+                        </label>
+                        <div class="card-sub" style="margin-left:23px">
+                            @if ($values['invoice_auto_issue'] ?? false)
+                                Email dikirim lewat antrean, jadi butuh container <span class="mono">queue</span> berjalan.
+                                Pelanggan tanpa alamat email dilewati.
+                            @else
+                                Hanya bisa diaktifkan bila penerbitan otomatis menyala.
+                            @endif
+                        </div>
+
+                        @if ($values['invoice_auto_issue'] ?? false)
+                            <div class="alert alert-warning" style="margin-top:14px">
+                                <strong>Invoice akan langsung ditagihkan tanpa diperiksa manusia.</strong>
+                                Sebagai pengaman, invoice yang bermasalah tetap berhenti sebagai draft:
+                                meter tanpa pembacaan sepanjang periode, dan stand meter yang mundur
+                                (reset/rollover). Keduanya menghasilkan angka yang hampir pasti salah.
+                            </div>
+                        @endif
+                    </div>
                 </div>
 
                 {{-- ── IoT ─────────────────────────────────────────────── --}}

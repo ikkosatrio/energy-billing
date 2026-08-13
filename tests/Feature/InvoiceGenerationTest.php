@@ -8,10 +8,12 @@ use App\Models\MeterReading;
 use App\Models\PowerMeter;
 use App\Models\TariffGroup;
 use App\Services\Billing\InvoiceGenerator;
+use App\Mail\InvoiceMail;
 use App\Services\SettingService;
 use Database\Seeders\SettingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class InvoiceGenerationTest extends TestCase
@@ -294,5 +296,116 @@ class InvoiceGenerationTest extends TestCase
         $invoice = $this->generate();
 
         $this->assertSame(21, $invoice->issue_date->diffInDays($invoice->due_date));
+    }
+
+    // ── Penerbitan & pengiriman otomatis ─────────────────────────────────
+
+    public function test_default_invoice_berhenti_sebagai_draft(): void
+    {
+        $this->scenario();
+
+        $this->assertSame('draft', $this->generate()->status);
+    }
+
+    public function test_auto_issue_menerbitkan_invoice_langsung(): void
+    {
+        $this->setting('invoice_auto_issue', true);
+
+        $this->scenario();
+
+        $this->assertSame('issued', $this->generate()->status);
+    }
+
+    /**
+     * Pengaman terpenting: invoice bermasalah tidak boleh ditagihkan tanpa
+     * dilihat manusia, berapa pun setelan auto-issue-nya.
+     */
+    public function test_auto_issue_tidak_menerbitkan_invoice_tanpa_pembacaan_meter(): void
+    {
+        $this->setting('invoice_auto_issue', true);
+
+        $meter = PowerMeter::create(['code' => 'MTR-09', 'name' => 'Tanpa Data', 'multiplier' => 1]);
+        $group = TariffGroup::create(['code' => 'B-3/TR', 'name' => 'B-3']);
+        $group->rates()->create(['rate_lwbp' => 1000, 'rate_wbp' => 1400, 'effective_from' => '2026-01-01']);
+
+        Customer::create([
+            'code' => 'C-009', 'name' => 'Belum Ada Pembacaan',
+            'power_meter_id' => $meter->id, 'tariff_group_id' => $group->id,
+            'biaya_beban_mode' => 'flat', 'status' => 'active',
+        ]);
+
+        $invoice = $this->generate();
+
+        $this->assertSame('draft', $invoice->status);
+        $this->assertStringContainsString('Tidak ada pembacaan meter', $invoice->notes);
+    }
+
+    public function test_auto_issue_tidak_menerbitkan_invoice_saat_stand_meter_mundur(): void
+    {
+        $this->setting('invoice_auto_issue', true);
+
+        $meter = PowerMeter::create(['code' => 'MTR-10', 'name' => 'Reset', 'multiplier' => 1]);
+        $group = TariffGroup::create(['code' => 'B-3/TR', 'name' => 'B-3']);
+        $group->rates()->create(['rate_lwbp' => 1000, 'rate_wbp' => 1400, 'effective_from' => '2026-01-01']);
+
+        MeterReading::insert([
+            ['power_meter_id' => $meter->id, 'read_at' => '2026-07-01 00:00:00', 'stand_lwbp' => 900000, 'stand_wbp' => 100, 'source' => 'api'],
+            ['power_meter_id' => $meter->id, 'read_at' => '2026-07-31 23:00:00', 'stand_lwbp' => 120, 'stand_wbp' => 200, 'source' => 'api'],
+        ]);
+
+        Customer::create([
+            'code' => 'C-010', 'name' => 'Meter Reset',
+            'power_meter_id' => $meter->id, 'tariff_group_id' => $group->id,
+            'biaya_beban_mode' => 'flat', 'status' => 'active',
+        ]);
+
+        $invoice = $this->generate();
+
+        $this->assertSame('draft', $invoice->status);
+        $this->assertStringContainsString('Stand meter mundur', $invoice->notes);
+    }
+
+    public function test_auto_send_mengantrekan_email_saat_invoice_terbit(): void
+    {
+        Mail::fake();
+        $this->setting('invoice_auto_issue', true);
+        $this->setting('invoice_auto_send', true);
+
+        $this->scenario(['email' => 'pelanggan@example.com']);
+        $this->generate();
+
+        Mail::assertQueued(InvoiceMail::class);
+    }
+
+    public function test_auto_send_dilewati_bila_invoice_masih_draft(): void
+    {
+        Mail::fake();
+        // auto_issue mati, jadi invoice tetap draft meski auto_send menyala.
+        $this->setting('invoice_auto_issue', false);
+        $this->setting('invoice_auto_send', true);
+
+        $this->scenario(['email' => 'pelanggan@example.com']);
+        $this->generate();
+
+        Mail::assertNothingQueued();
+    }
+
+    public function test_email_gagal_tidak_membatalkan_invoice(): void
+    {
+        Mail::fake();
+        $this->setting('invoice_auto_issue', true);
+        $this->setting('invoice_auto_send', true);
+
+        // Pelanggan tanpa email membuat pengiriman melempar exception.
+        $this->scenario(['email' => null]);
+
+        $generator = app(InvoiceGenerator::class);
+        $period = $generator->periodFor(Carbon::parse('2026-07-01'));
+        $result = $generator->generate($period);
+
+        $this->assertSame(1, $result['created']);
+        $this->assertSame('issued', Invoice::first()->status);
+        $this->assertNotEmpty($result['failed']);
+        Mail::assertNothingQueued();
     }
 }

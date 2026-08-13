@@ -17,6 +17,7 @@ class InvoiceGenerator
         private readonly InvoiceCalculator $calculator,
         private readonly InvoiceNumberGenerator $numbers,
         private readonly TariffService $tariff,
+        private readonly InvoiceDocumentService $documents,
     ) {
     }
 
@@ -79,8 +80,9 @@ class InvoiceGenerator
             }
 
             try {
-                $this->generateFor($period, $customer, $existing);
+                $invoice = $this->generateFor($period, $customer, $existing);
                 $created++;
+                $this->autoSend($invoice, $failed);
             } catch (\Throwable $e) {
                 report($e);
                 $failed[] = "{$customer->name}: {$e->getMessage()}";
@@ -100,6 +102,30 @@ class InvoiceGenerator
         );
 
         return ['created' => $created, 'skipped' => $skipped, 'failed' => $failed];
+    }
+
+    /**
+     * Mengirim invoice ke pelanggan bila auto-send dinyalakan.
+     *
+     * Hanya invoice yang benar-benar terbit yang dikirim — draft berarti masih
+     * menunggu diperiksa. Kegagalan dicatat sebagai peringatan, tidak
+     * membatalkan invoice-nya: tagihannya sudah sah, yang gagal cuma
+     * pengantarannya.
+     *
+     * @param  array<int, string>  $failed
+     */
+    private function autoSend(Invoice $invoice, array &$failed): void
+    {
+        if (!setting('invoice_auto_send', false) || $invoice->status !== 'issued') {
+            return;
+        }
+
+        try {
+            $this->documents->email($invoice, queue: true);
+        } catch (\Throwable $e) {
+            report($e);
+            $failed[] = "{$invoice->customer_name}: invoice terbit tapi email gagal dikirim — {$e->getMessage()}";
+        }
     }
 
     /**
@@ -131,6 +157,16 @@ class InvoiceGenerator
             $notes[] = 'Stand meter mundur (kemungkinan reset/rollover). Pemakaian perlu dikoreksi manual.';
         }
 
+        /*
+         * Invoice bermasalah TIDAK PERNAH diterbitkan otomatis, berapa pun
+         * setelan auto-issue-nya. Dua kasus yang ditandai di $notes — meter
+         * tanpa pembacaan dan stand meter yang mundur — menghasilkan angka
+         * yang hampir pasti salah; menagihkannya tanpa dilihat manusia berarti
+         * mengirim tagihan keliru ke pelanggan.
+         */
+        $autoIssue = (bool) setting('invoice_auto_issue', false);
+        $status = ($autoIssue && empty($notes)) ? 'issued' : 'draft';
+
         $payload = $amounts + [
             'billing_period_id' => $period->id,
             'customer_id' => $customer->id,
@@ -149,7 +185,7 @@ class InvoiceGenerator
             'period_end' => $end->toDateString(),
             'issue_date' => $issueDate->toDateString(),
             'due_date' => $issueDate->copy()->addDays($dueDays)->toDateString(),
-            'status' => 'draft',
+            'status' => $status,
             'notes' => $notes ? implode(' ', $notes) : null,
             'created_by' => auth()->id(),
         ];

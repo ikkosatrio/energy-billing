@@ -49,6 +49,15 @@ fi
 echo "${GREEN}Application initialized!${NC}"
 echo ""
 
+# Bila entrypoint dipanggil dengan argumen, jalankan itu dan berhenti di sini.
+# Dipakai service `scheduler` dan `queue` di docker-compose supaya keduanya
+# tetap melewati inisialisasi di atas (izin folder, package:discover, clear
+# cache) tapi menjalankan perintah artisan-nya sendiri, bukan Octane.
+if [ "$#" -gt 0 ]; then
+    echo "${GREEN}Menjalankan: $*${NC}"
+    exec "$@"
+fi
+
 # Start Octane on FrankenPHP. FrankenPHP (Caddy + PHP in one binary) serves
 # static assets directly from public/ AND executes Laravel — no Nginx or
 # PHP-FPM needed. Listens on port 80 so Traefik's routing is unaffected.

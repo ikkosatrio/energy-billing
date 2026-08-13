@@ -204,18 +204,51 @@ request.
 
 ## Perintah terjadwal
 
-Scheduler harus berjalan agar invoice dan agregat terbentuk otomatis:
+| Perintah                  | Jadwal              | Fungsi                                          |
+| ------------------------- | ------------------- | ----------------------------------------------- |
+| `readings:aggregate`      | tiap jam            | Meringkas pembacaan menjadi agregat harian      |
+| `invoices:generate`       | harian, jam setting | Menerbitkan invoice pelanggan yang jatuh tempo  |
+| `invoices:mark-overdue`   | harian 01:00        | Menandai invoice lewat jatuh tempo              |
+| `readings:prune`          | mingguan            | Menghapus pembacaan mentah di luar masa retensi |
+
+Di Docker, ketiganya dijalankan service **`scheduler`** (`schedule:work`) yang
+sudah ada di `docker-compose.yml`. Untuk development lokal jalankan sendiri:
 
 ```bash
 php artisan schedule:work
 ```
 
-| Perintah                  | Jadwal            | Fungsi                                         |
-| ------------------------- | ----------------- | ---------------------------------------------- |
-| `readings:aggregate`      | tiap jam          | Meringkas pembacaan menjadi agregat harian     |
-| `invoices:generate`       | harian, jam setting | Menerbitkan invoice pelanggan yang jatuh tempo |
-| `invoices:mark-overdue`   | harian 01:00      | Menandai invoice lewat jatuh tempo             |
-| `readings:prune`          | mingguan          | Menghapus pembacaan mentah di luar masa retensi |
+> Hanya boleh ada **satu** container scheduler. Dua scheduler berarti
+> `invoices:generate` jalan dua kali pada tanggal cut-off yang sama.
+
+Pengiriman email invoice lewat antrean ditangani service **`queue`**
+(`queue:work`). Tanpa container itu, email otomatis tidak akan terkirim —
+job-nya menumpuk di tabel `jobs`.
+
+## Penerbitan invoice otomatis
+
+Secara default invoice hasil generate berhenti sebagai **draft** agar sempat
+diperiksa. Di **Setting Aplikasi → Billing & Invoice → Otomatisasi** ada dua
+saklar:
+
+| Setelan | Efek |
+| ------- | ---- |
+| Terbitkan invoice otomatis | Status langsung `issued`, tidak perlu klik Terbitkan |
+| Kirim email otomatis | Setelah terbit, invoice + PDF diantrekan ke email pelanggan |
+
+Alur penuh saat keduanya menyala: scheduler memanggil `invoices:generate` →
+invoice dibuat dan diterbitkan → email masuk antrean → container `queue`
+mengirimnya.
+
+**Dua kasus tetap berhenti sebagai draft walau auto-issue menyala**, karena
+angkanya hampir pasti salah dan tidak boleh ditagihkan tanpa dilihat manusia:
+
+1. Meter tidak mengirim satu pun pembacaan sepanjang periode
+2. Stand meter mundur — meter di-reset atau angkanya berputar ke nol
+
+Keduanya diberi catatan pada invoice dan muncul di daftar sebagai draft.
+Pelanggan tanpa alamat email dilewati pengirimannya; invoice-nya tetap sah dan
+kegagalan tercatat di hasil generate.
 
 ## Testing
 
