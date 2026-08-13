@@ -8,21 +8,23 @@
             </div>
             <div class="field">
                 <label class="field-label">Aksi</label>
-                <select class="select" wire:model.live="actionFilter">
-                    <option value="">Semua aksi</option>
-                    @foreach ($actions as $action)
-                        <option value="{{ $action }}">{{ $action }}</option>
-                    @endforeach
-                </select>
+                <x-select-search
+                    wire:model.live="actionFilter"
+                    placeholder="Semua aksi"
+                    search-placeholder="Cari aksi…"
+                    :options="$actions
+                        ->map(fn ($action) => ['value' => $action, 'label' => $action])
+                        ->prepend(['value' => '', 'label' => 'Semua aksi'])" />
             </div>
             <div class="field">
                 <label class="field-label">User</label>
-                <select class="select" wire:model.live="userFilter">
-                    <option value="">Semua user</option>
-                    @foreach ($users as $user)
-                        <option value="{{ $user->id }}">{{ $user->name }}</option>
-                    @endforeach
-                </select>
+                <x-select-search
+                    wire:model.live="userFilter"
+                    placeholder="Semua user"
+                    search-placeholder="Cari nama user…"
+                    :options="$users
+                        ->map(fn ($user) => ['value' => $user->id, 'label' => $user->name])
+                        ->prepend(['value' => '', 'label' => 'Semua user'])" />
             </div>
             <div class="field">
                 <label class="field-label">Dari</label>

@@ -121,12 +121,16 @@
 
                     <div class="field">
                         <label class="field-label">Role <span style="color:var(--danger)">*</span></label>
-                        <select class="select @error('form.role_id') is-invalid @enderror" wire:model="form.role_id">
-                            <option value="">— pilih role —</option>
-                            @foreach ($roles as $role)
-                                <option value="{{ $role->id }}">{{ $role->name }}</option>
-                            @endforeach
-                        </select>
+                        <x-select-search
+                            wire:model="form.role_id"
+                            :invalid="$errors->has('form.role_id')"
+                            placeholder="— pilih role —"
+                            search-placeholder="Cari role…"
+                            :options="$roles->map(fn ($role) => [
+                                'value' => $role->id,
+                                'label' => $role->name,
+                                'sub' => $role->description,
+                            ])" />
                         @error('form.role_id') <div class="field-error">{{ $message }}</div> @enderror
                     </div>
 

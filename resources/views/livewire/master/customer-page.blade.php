@@ -10,11 +10,12 @@
             </div>
             <div class="field">
                 <label class="field-label">Status</label>
-                <select class="select" wire:model.live="statusFilter">
-                    <option value="">Semua status</option>
-                    <option value="active">Aktif</option>
-                    <option value="inactive">Nonaktif</option>
-                </select>
+                <x-select-search wire:model.live="statusFilter" placeholder="Semua status"
+                    :options="[
+                        ['value' => '', 'label' => 'Semua status'],
+                        ['value' => 'active', 'label' => 'Aktif'],
+                        ['value' => 'inactive', 'label' => 'Nonaktif'],
+                    ]" />
             </div>
             <div class="spacer"></div>
             @can('customer.create')
@@ -152,23 +153,34 @@
                         <div>
                             <div class="field">
                                 <label class="field-label">Power Meter</label>
-                                <select class="select @error('form.power_meter_id') is-invalid @enderror" wire:model="form.power_meter_id">
-                                    <option value="">— belum terhubung —</option>
-                                    @foreach ($availableMeters as $meter)
-                                        <option value="{{ $meter->id }}">{{ $meter->code }} — {{ $meter->name }}</option>
-                                    @endforeach
-                                </select>
+                                <x-select-search
+                                    wire:model="form.power_meter_id"
+                                    :invalid="$errors->has('form.power_meter_id')"
+                                    placeholder="— belum terhubung —"
+                                    search-placeholder="Cari kode atau nama meter…"
+                                    :options="$availableMeters
+                                        ->map(fn ($meter) => [
+                                            'value' => $meter->id,
+                                            'label' => $meter->code.' — '.$meter->name,
+                                            'sub' => 'ID meter '.$meter->id,
+                                        ])
+                                        ->prepend(['value' => '', 'label' => '— belum terhubung —'])" />
                                 @error('form.power_meter_id') <div class="field-error">{{ $message }}</div> @enderror
                             </div>
 
                             <div class="field">
                                 <label class="field-label">Golongan Tarif</label>
-                                <select class="select" wire:model="form.tariff_group_id">
-                                    <option value="">— pilih golongan —</option>
-                                    @foreach ($tariffGroups as $group)
-                                        <option value="{{ $group->id }}">{{ $group->code }} — {{ $group->name }}</option>
-                                    @endforeach
-                                </select>
+                                <x-select-search
+                                    wire:model="form.tariff_group_id"
+                                    placeholder="— pilih golongan —"
+                                    search-placeholder="Cari golongan tarif…"
+                                    :options="$tariffGroups
+                                        ->map(fn ($group) => [
+                                            'value' => $group->id,
+                                            'label' => $group->code,
+                                            'sub' => $group->name,
+                                        ])
+                                        ->prepend(['value' => '', 'label' => '— pilih golongan —'])" />
                             </div>
 
                             <div class="field">
@@ -178,10 +190,11 @@
 
                             <div class="field">
                                 <label class="field-label">Mode Biaya Beban</label>
-                                <select class="select" wire:model.live="form.biaya_beban_mode">
-                                    <option value="flat">Nominal flat</option>
-                                    <option value="per_kva">kVA × tarif beban golongan</option>
-                                </select>
+                                <x-select-search wire:model.live="form.biaya_beban_mode"
+                                    :options="[
+                                        ['value' => 'flat', 'label' => 'Nominal flat'],
+                                        ['value' => 'per_kva', 'label' => 'kVA × tarif beban golongan'],
+                                    ]" />
                             </div>
 
                             @if ($form['biaya_beban_mode'] === 'flat')
@@ -217,10 +230,11 @@
 
                             <div class="field">
                                 <label class="field-label">Status</label>
-                                <select class="select" wire:model="form.status">
-                                    <option value="active">Aktif</option>
-                                    <option value="inactive">Nonaktif</option>
-                                </select>
+                                <x-select-search wire:model="form.status"
+                                    :options="[
+                                        ['value' => 'active', 'label' => 'Aktif'],
+                                        ['value' => 'inactive', 'label' => 'Nonaktif'],
+                                    ]" />
                             </div>
                         </div>
                     </div>

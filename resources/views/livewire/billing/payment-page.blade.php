@@ -88,15 +88,16 @@
                 <form wire:submit="save">
                     <div class="field">
                         <label class="field-label">Invoice <span style="color:var(--danger)">*</span></label>
-                        <select class="select @error('form.invoice_id') is-invalid @enderror" wire:model.live="form.invoice_id">
-                            <option value="">— pilih invoice —</option>
-                            @foreach ($openInvoices as $invoice)
-                                <option value="{{ $invoice->id }}">
-                                    {{ $invoice->invoice_no }} — {{ $invoice->customer_name }}
-                                    (sisa {{ rupiah($invoice->total_amount - $invoice->paid_amount) }})
-                                </option>
-                            @endforeach
-                        </select>
+                        <x-select-search
+                            wire:model.live="form.invoice_id"
+                            :invalid="$errors->has('form.invoice_id')"
+                            placeholder="— pilih invoice —"
+                            search-placeholder="Cari no invoice atau pelanggan…"
+                            :options="$openInvoices->map(fn ($invoice) => [
+                                'value' => $invoice->id,
+                                'label' => $invoice->invoice_no.' — '.$invoice->customer_name,
+                                'sub' => 'Sisa '.rupiah($invoice->total_amount - $invoice->paid_amount),
+                            ])" />
                         @error('form.invoice_id') <div class="field-error">{{ $message }}</div> @enderror
                         @if ($openInvoices->isEmpty())
                             <div class="card-sub">Tidak ada invoice yang menunggu pembayaran.</div>
@@ -119,11 +120,12 @@
 
                     <div class="field">
                         <label class="field-label">Metode</label>
-                        <select class="select" wire:model="form.method">
-                            <option value="transfer">Transfer</option>
-                            <option value="cash">Tunai</option>
-                            <option value="other">Lainnya</option>
-                        </select>
+                        <x-select-search wire:model="form.method"
+                            :options="[
+                                ['value' => 'transfer', 'label' => 'Transfer'],
+                                ['value' => 'cash', 'label' => 'Tunai'],
+                                ['value' => 'other', 'label' => 'Lainnya'],
+                            ]" />
                     </div>
 
                     <div class="field">

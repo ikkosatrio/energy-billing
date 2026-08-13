@@ -12,12 +12,13 @@
             </div>
             <div class="field">
                 <label class="field-label">Pelanggan</label>
-                <select class="select" wire:model.live="customerId">
-                    <option value="">Semua pelanggan</option>
-                    @foreach ($customers as $customer)
-                        <option value="{{ $customer->id }}">{{ $customer->name }}</option>
-                    @endforeach
-                </select>
+                <x-select-search
+                    wire:model.live="customerId"
+                    placeholder="Semua pelanggan"
+                    search-placeholder="Cari nama pelanggan…"
+                    :options="$customers
+                        ->map(fn ($customer) => ['value' => $customer->id, 'label' => $customer->name])
+                        ->prepend(['value' => '', 'label' => 'Semua pelanggan'])" />
             </div>
             <div class="spacer"></div>
             @can('report.export')

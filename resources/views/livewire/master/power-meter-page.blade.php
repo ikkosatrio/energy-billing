@@ -10,12 +10,13 @@
             </div>
             <div class="field">
                 <label class="field-label">Status</label>
-                <select class="select" wire:model.live="statusFilter">
-                    <option value="">Semua status</option>
-                    <option value="active">Aktif</option>
-                    <option value="maintenance">Maintenance</option>
-                    <option value="inactive">Nonaktif</option>
-                </select>
+                <x-select-search wire:model.live="statusFilter" placeholder="Semua status"
+                    :options="[
+                        ['value' => '', 'label' => 'Semua status'],
+                        ['value' => 'active', 'label' => 'Aktif'],
+                        ['value' => 'maintenance', 'label' => 'Maintenance'],
+                        ['value' => 'inactive', 'label' => 'Nonaktif'],
+                    ]" />
             </div>
             <div class="spacer"></div>
             @can('meter.create')
@@ -171,11 +172,12 @@
 
                             <div class="field">
                                 <label class="field-label">Status</label>
-                                <select class="select" wire:model="form.status">
-                                    <option value="active">Aktif</option>
-                                    <option value="maintenance">Maintenance</option>
-                                    <option value="inactive">Nonaktif</option>
-                                </select>
+                                <x-select-search wire:model="form.status"
+                                    :options="[
+                                        ['value' => 'active', 'label' => 'Aktif'],
+                                        ['value' => 'maintenance', 'label' => 'Maintenance'],
+                                        ['value' => 'inactive', 'label' => 'Nonaktif'],
+                                    ]" />
                             </div>
 
                             <div class="field">

@@ -16,8 +16,8 @@
 
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="{{ asset('assets/css/tailwind.css') }}?v={{ config('app.version') }}">
-  <link rel="stylesheet" href="{{ asset('assets/css/app.css') }}?v={{ config('app.version') }}">
+  <link rel="stylesheet" href="{{ asset_v('assets/css/tailwind.css') }}">
+  <link rel="stylesheet" href="{{ asset_v('assets/css/app.css') }}">
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
 
@@ -53,9 +53,14 @@
   <script src="https://unpkg.com/lucide@0.462.0/dist/umd/lucide.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
 
-  <script src="{{ asset('assets/js/core/spa-navigate.js') }}?v={{ config('app.version') }}"></script>
-  <script defer src="{{ asset('assets/js/core/toast.js') }}?v={{ config('app.version') }}"></script>
-  <script defer src="{{ asset('assets/js/core/utils.js') }}?v={{ config('app.version') }}"></script>
+  <script src="{{ asset_v('assets/js/core/spa-navigate.js') }}"></script>
+  <script defer src="{{ asset_v('assets/js/core/toast.js') }}"></script>
+  <script defer src="{{ asset_v('assets/js/core/utils.js') }}"></script>
+
+  {{-- Harus dimuat sebelum @livewireScripts: Alpine dibundel Livewire dan
+       memanggil alpine:init saat boot, jadi Alpine.data() perlu sudah
+       terdaftar sebelum itu. --}}
+  <script src="{{ asset_v('assets/js/core/select-search.js') }}"></script>
 
   <script>
     // Lucide mengganti setiap <i data-lucide> dengan <svg> sekali jalan, jadi

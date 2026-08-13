@@ -4,12 +4,13 @@
         <div class="filter-bar">
             <div class="field">
                 <label class="field-label">Status Koneksi</label>
-                <select class="select" wire:model.live="connectionFilter">
-                    <option value="">Semua</option>
-                    <option value="online">Online</option>
-                    <option value="offline">Offline</option>
-                    <option value="maintenance">Maintenance</option>
-                </select>
+                <x-select-search wire:model.live="connectionFilter" placeholder="Semua"
+                    :options="[
+                        ['value' => '', 'label' => 'Semua'],
+                        ['value' => 'online', 'label' => 'Online'],
+                        ['value' => 'offline', 'label' => 'Offline'],
+                        ['value' => 'maintenance', 'label' => 'Maintenance'],
+                    ]" />
             </div>
             <div class="spacer"></div>
             <div class="chip">

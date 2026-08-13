@@ -31,24 +31,26 @@
             </div>
             <div class="field">
                 <label class="field-label">Periode</label>
-                <select class="select" wire:model.live="periodFilter">
-                    <option value="">Semua periode</option>
-                    @foreach ($periods as $period)
-                        <option value="{{ $period->id }}">{{ $period->code }}</option>
-                    @endforeach
-                </select>
+                <x-select-search
+                    wire:model.live="periodFilter"
+                    placeholder="Semua periode"
+                    search-placeholder="Cari periode…"
+                    :options="$periods
+                        ->map(fn ($period) => ['value' => $period->id, 'label' => $period->code])
+                        ->prepend(['value' => '', 'label' => 'Semua periode'])" />
             </div>
             <div class="field">
                 <label class="field-label">Status</label>
-                <select class="select" wire:model.live="statusFilter">
-                    <option value="">Semua status</option>
-                    <option value="draft">Draft</option>
-                    <option value="issued">Belum Bayar</option>
-                    <option value="partial">Bayar Sebagian</option>
-                    <option value="paid">Lunas</option>
-                    <option value="overdue">Jatuh Tempo</option>
-                    <option value="cancelled">Dibatalkan</option>
-                </select>
+                <x-select-search wire:model.live="statusFilter" placeholder="Semua status"
+                    :options="[
+                        ['value' => '', 'label' => 'Semua status'],
+                        ['value' => 'draft', 'label' => 'Draft'],
+                        ['value' => 'issued', 'label' => 'Belum Bayar'],
+                        ['value' => 'partial', 'label' => 'Bayar Sebagian'],
+                        ['value' => 'paid', 'label' => 'Lunas'],
+                        ['value' => 'overdue', 'label' => 'Jatuh Tempo'],
+                        ['value' => 'cancelled', 'label' => 'Dibatalkan'],
+                    ]" />
             </div>
         </div>
     </div>

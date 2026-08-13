@@ -26,8 +26,8 @@
     <link rel="stylesheet" type="text/css" href="{{ l5_swagger_asset($documentation, 'swagger-ui.css') }}">
     {{-- app.css dimuat lebih dulu karena hanya dipakai sebagai sumber token
          (variabel :root); swagger-theme.css yang menerapkannya ke Swagger UI. --}}
-    <link rel="stylesheet" href="{{ asset('assets/css/app.css') }}?v={{ config('app.version') }}">
-    <link rel="stylesheet" href="{{ asset('assets/css/swagger-theme.css') }}?v={{ config('app.version') }}">
+    <link rel="stylesheet" href="{{ asset_v('assets/css/app.css') }}">
+    <link rel="stylesheet" href="{{ asset_v('assets/css/swagger-theme.css') }}">
 
     <link rel="icon" type="image/png" href="{{ l5_swagger_asset($documentation, 'favicon-32x32.png') }}" sizes="32x32"/>
     <link rel="icon" type="image/png" href="{{ l5_swagger_asset($documentation, 'favicon-16x16.png') }}" sizes="16x16"/>

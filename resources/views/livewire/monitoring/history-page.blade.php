@@ -9,11 +9,14 @@
             <div class="filter-bar">
                 <div class="field">
                     <label class="field-label">Power Meter</label>
-                    <select class="select" wire:model.live="meterId">
-                        @foreach ($meters as $option)
-                            <option value="{{ $option->id }}">{{ $option->code }} — {{ $option->name }}</option>
-                        @endforeach
-                    </select>
+                    <x-select-search
+                        wire:model.live="meterId"
+                        search-placeholder="Cari kode, nama, atau lokasi meter…"
+                        :options="$meters->map(fn ($option) => [
+                            'value' => $option->id,
+                            'label' => $option->code.' — '.$option->name,
+                            'sub' => 'ID meter '.$option->id,
+                        ])" />
                 </div>
                 <div class="field">
                     <label class="field-label">Bulan</label>

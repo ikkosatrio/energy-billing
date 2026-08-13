@@ -12,11 +12,14 @@
             <div class="filter-bar">
                 <div class="field">
                     <label class="field-label">Power Meter</label>
-                    <select class="select" wire:model.live="meterId">
-                        @foreach ($meters as $option)
-                            <option value="{{ $option->id }}">{{ $option->code }} — {{ $option->name }}</option>
-                        @endforeach
-                    </select>
+                    <x-select-search
+                        wire:model.live="meterId"
+                        search-placeholder="Cari kode atau nama meter…"
+                        :options="$meters->map(fn ($option) => [
+                            'value' => $option->id,
+                            'label' => $option->code.' — '.$option->name,
+                            'sub' => 'ID meter '.$option->id,
+                        ])" />
                 </div>
                 @if ($meter)
                     <div class="field">
@@ -81,11 +84,11 @@
                                                wire:model.live="periods.{{ $index }}.start_time">
                                     </td>
                                     <td>
-                                        <select class="select" style="padding:7px 10px"
-                                                wire:model.live="periods.{{ $index }}.tariff_type">
-                                            <option value="LWBP">LWBP (Flat)</option>
-                                            <option value="WBP">WBP (Peak)</option>
-                                        </select>
+                                        <x-select-search wire:model.live="periods.{{ $index }}.tariff_type"
+                                            :options="[
+                                                ['value' => 'LWBP', 'label' => 'LWBP (Flat)'],
+                                                ['value' => 'WBP', 'label' => 'WBP (Peak)'],
+                                            ]" />
                                     </td>
                                     <td class="mono text-muted">{{ $preview['end_time'] ?? '—' }}</td>
                                     <td class="text-muted">
