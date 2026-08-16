@@ -17,8 +17,6 @@ class DashboardController extends Controller
             'billing' => $this->dashboard->currentBilling(),
             'meterStatus' => $this->dashboard->meterStatus(),
             'outstanding' => $this->dashboard->outstanding(),
-            'meters' => $this->dashboard->meterList(),
-            'recentInvoices' => $this->dashboard->recentInvoices(),
         ]);
     }
 }

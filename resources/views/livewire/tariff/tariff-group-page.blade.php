@@ -71,9 +71,13 @@
                                     <span class="link-action muted" wire:click="editGroup({{ $group->id }})" style="margin-right:12px">Ubah</span>
                                 @endcan
                                 @can('tariff.delete')
-                                    <span class="link-action danger"
-                                          wire:click="deleteGroup({{ $group->id }})"
-                                          wire:confirm="Hapus golongan {{ $group->code }} beserta seluruh riwayat tarifnya?">Hapus</span>
+                                    <span class="link-action danger" x-on:click="ConfirmDialog.show({
+                                            title: 'Hapus golongan ' + @js($group->code) + '?',
+                                            text: 'Seluruh riwayat tarifnya ikut terhapus dan tidak bisa dikembalikan.',
+                                            danger: true,
+                                            confirmText: 'Ya, Hapus',
+                                            onConfirm: () => $wire.deleteGroup({{ $group->id }}),
+                                        })">Hapus</span>
                                 @endcan
                             </td>
                         </tr>

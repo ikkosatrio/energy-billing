@@ -16,6 +16,9 @@ class PowerMeterPage extends Component
 
     public string $statusFilter = '';
 
+    /** Kosong = semua jenis sambungan. */
+    public string $phaseFilter = '';
+
     public ?int $editingId = null;
 
     public bool $showForm = false;
@@ -37,6 +40,11 @@ class PowerMeterPage extends Component
         $this->resetPage();
     }
 
+    public function updatedPhaseFilter(): void
+    {
+        $this->resetPage();
+    }
+
     protected function rules(): array
     {
         return [
@@ -47,6 +55,7 @@ class PowerMeterPage extends Component
             'form.model' => ['nullable', 'string', 'max:100'],
             'form.location' => ['nullable', 'string', 'max:255'],
             'form.ct_ratio' => ['nullable', 'string', 'max:50'],
+            'form.phase' => ['required', 'in:1,3'],
             'form.multiplier' => ['required', 'numeric', 'min:0.0001'],
             'form.stand_max' => ['nullable', 'numeric', 'min:1'],
             'form.status' => ['required', 'in:active,inactive,maintenance'],
@@ -60,6 +69,7 @@ class PowerMeterPage extends Component
         return [
             'form.code' => 'kode meter',
             'form.name' => 'nama meter',
+            'form.phase' => 'jenis sambungan',
             'form.multiplier' => 'pengali',
             'form.stand_max' => 'angka maksimum register',
         ];
@@ -77,7 +87,7 @@ class PowerMeterPage extends Component
     {
         $this->authorize('meter.update');
 
-        $meter = PowerMeter::findOrFail($id);
+        $meter = PowerMeter::with('deviceStatus')->findOrFail($id);
 
         $this->editingId = $meter->id;
         $this->form = [
@@ -86,6 +96,7 @@ class PowerMeterPage extends Component
             'serial_no' => $meter->serial_no,
             'brand' => $meter->brand,
             'model' => $meter->model,
+            'phase' => $meter->phase,
             'location' => $meter->location,
             'ct_ratio' => $meter->ct_ratio,
             'multiplier' => $meter->multiplier,
@@ -152,6 +163,7 @@ class PowerMeterPage extends Component
             'serial_no' => '',
             'brand' => '',
             'model' => '',
+            'phase' => '3',
             'location' => '',
             'ct_ratio' => '',
             'multiplier' => 1,
@@ -166,7 +178,7 @@ class PowerMeterPage extends Component
     public function render()
     {
         $meters = PowerMeter::query()
-            ->with(['customer:id,power_meter_id,name', 'latestReading'])
+            ->with(['customer:id,power_meter_id,name', 'latestReading', 'deviceStatus'])
             ->when($this->search, fn ($q) => $q->where(function ($sub) {
                 $sub->where('name', 'like', "%{$this->search}%")
                     ->orWhere('code', 'like', "%{$this->search}%")
@@ -174,11 +186,17 @@ class PowerMeterPage extends Component
                     ->orWhere('location', 'like', "%{$this->search}%");
             }))
             ->when($this->statusFilter, fn ($q) => $q->where('status', $this->statusFilter))
+            ->when($this->phaseFilter, fn ($q) => $q->where('phase', $this->phaseFilter))
             ->orderBy('name')
             ->paginate(15);
 
         return view('livewire.master.power-meter-page', [
             'meters' => $meters,
+            // Panel hanya-baca di form; null untuk perangkat baru yang belum
+            // pernah mengirim status.
+            'editingStatus' => $this->editingId
+                ? \App\Models\PowerMeterStatus::find($this->editingId)
+                : null,
             'ingestUrl' => url('/api/v1/readings'),
             'docsUrl' => url('/api/documentation'),
         ]);

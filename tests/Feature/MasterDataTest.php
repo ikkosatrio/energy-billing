@@ -217,6 +217,76 @@ class MasterDataTest extends TestCase
         $this->assertSame(0, MeterTariffSchedule::where('power_meter_id', $meter->id)->count());
     }
 
+    public function test_jadwal_bisa_diduplikat_dari_meter_lain(): void
+    {
+        $sumber = PowerMeter::create(['code' => 'MTR-01', 'name' => 'Sumber', 'multiplier' => 1]);
+        $tujuan = PowerMeter::create(['code' => 'MTR-02', 'name' => 'Tujuan', 'multiplier' => 1]);
+
+        Livewire::test(TariffSchedulePage::class)
+            ->set('meterId', $sumber->id)
+            ->set('periods', [
+                ['start_time' => '00:00', 'tariff_type' => 'LWBP'],
+                ['start_time' => '18:00', 'tariff_type' => 'WBP'],
+                ['start_time' => '23:00', 'tariff_type' => 'LWBP'],
+            ])
+            ->call('save');
+
+        $component = Livewire::test(TariffSchedulePage::class)
+            ->set('meterId', $tujuan->id)
+            ->call('copyFrom', $sumber->id);
+
+        // Masuk ke form dulu, belum tersimpan — pengguna masih bisa memeriksa.
+        $component->assertSet('periods', [
+            ['start_time' => '00:00', 'tariff_type' => 'LWBP'],
+            ['start_time' => '18:00', 'tariff_type' => 'WBP'],
+            ['start_time' => '23:00', 'tariff_type' => 'LWBP'],
+        ]);
+        $this->assertSame(0, MeterTariffSchedule::where('power_meter_id', $tujuan->id)->count());
+
+        $component->call('save');
+
+        $this->assertSame(3, MeterTariffSchedule::where('power_meter_id', $tujuan->id)->count());
+    }
+
+    public function test_duplikat_dari_meter_tanpa_jadwal_ditolak(): void
+    {
+        $kosong = PowerMeter::create(['code' => 'MTR-01', 'name' => 'Kosong', 'multiplier' => 1]);
+        $tujuan = PowerMeter::create(['code' => 'MTR-02', 'name' => 'Tujuan', 'multiplier' => 1]);
+
+        Livewire::test(TariffSchedulePage::class)
+            ->set('meterId', $tujuan->id)
+            ->set('periods', [['start_time' => '00:00', 'tariff_type' => 'WBP']])
+            ->call('copyFrom', $kosong->id)
+            // Form tidak ikut terhapus saat sumbernya kosong.
+            ->assertSet('periods', [['start_time' => '00:00', 'tariff_type' => 'WBP']]);
+    }
+
+    public function test_duplikat_ditolak_tanpa_izin_ubah_tarif(): void
+    {
+        $sumber = PowerMeter::create(['code' => 'MTR-01', 'name' => 'Sumber', 'multiplier' => 1]);
+        $tujuan = PowerMeter::create(['code' => 'MTR-02', 'name' => 'Tujuan', 'multiplier' => 1]);
+
+        Livewire::test(TariffSchedulePage::class)
+            ->set('meterId', $sumber->id)
+            ->set('periods', [
+                ['start_time' => '00:00', 'tariff_type' => 'LWBP'],
+                ['start_time' => '18:00', 'tariff_type' => 'WBP'],
+            ])
+            ->call('save');
+
+        $viewer = User::create([
+            'name' => 'Viewer', 'username' => 'viewer', 'email' => 'viewer@test.local',
+            'password' => 'secret123', 'role_id' => Role::where('slug', 'viewer')->value('id'),
+        ]);
+
+        $this->actingAs($viewer);
+
+        Livewire::test(TariffSchedulePage::class)
+            ->set('meterId', $tujuan->id)
+            ->call('copyFrom', $sumber->id)
+            ->assertForbidden();
+    }
+
     public function test_user_tanpa_izin_tidak_bisa_membuat_pelanggan(): void
     {
         $viewer = User::create([

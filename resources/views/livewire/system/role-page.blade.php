@@ -50,9 +50,12 @@
                                 @can('role.manage')
                                     <span class="link-action" wire:click="edit({{ $role->id }})" style="margin-right:12px">Ubah</span>
                                     @unless ($role->is_system)
-                                        <span class="link-action danger"
-                                              wire:click="delete({{ $role->id }})"
-                                              wire:confirm="Hapus role {{ $role->name }}?">Hapus</span>
+                                        <span class="link-action danger" x-on:click="ConfirmDialog.show({
+                                                title: 'Hapus role ' + @js($role->name) + '?',
+                                                danger: true,
+                                                confirmText: 'Ya, Hapus',
+                                                onConfirm: () => $wire.delete({{ $role->id }}),
+                                            })">Hapus</span>
                                     @endunless
                                 @endcan
                             </td>

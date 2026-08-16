@@ -5,6 +5,8 @@ namespace App\Livewire\Report;
 use App\Models\MeterReading;
 use App\Models\MeterReadingDaily;
 use App\Models\PowerMeter;
+use App\Services\ActivityLogger;
+use App\Services\Monitoring\DataRetentionService;
 use App\Services\Report\ReportService;
 use Illuminate\Support\Carbon;
 use Livewire\Component;
@@ -20,6 +22,14 @@ use Livewire\WithPagination;
 class ReadingReportPage extends Component
 {
     use WithPagination;
+
+    /** Livewire tidak menyuntik lewat constructor; diambil dari container. */
+    private DataRetentionService $retention;
+
+    public function boot(DataRetentionService $retention): void
+    {
+        $this->retention = $retention;
+    }
 
     public ?int $meterId = null;
 
@@ -50,14 +60,19 @@ class ReadingReportPage extends Component
 
     public function render(ReportService $reports)
     {
-        $meters = PowerMeter::orderBy('code')->get(['id', 'code', 'name', 'location']);
+        $meters = PowerMeter::orderBy('code')->get(['id', 'code', 'name', 'location', 'phase']);
+        $selectedMeter = $this->meterId ? $meters->firstWhere('id', $this->meterId) : null;
 
-        if (!$this->meterId || $meters->isEmpty()) {
+        if (!$selectedMeter) {
             return view('livewire.report.reading-report-page', [
                 'meters' => $meters,
                 'rows' => collect(),
                 'readings' => null,
                 'summary' => $this->emptySummary(),
+                'lines' => ['r' => 'R', 's' => 'S', 't' => 'T'],
+                'retentionRange' => ['count' => 0, 'first_at' => null, 'last_at' => null],
+                'retentionMonths' => $this->retention->retentionMonths(),
+                'wouldPurgeCount' => 0,
                 'exportQuery' => '',
             ]);
         }
@@ -88,12 +103,50 @@ class ReadingReportPage extends Component
             'rows' => $rows,
             'readings' => $readings,
             'summary' => $this->summary($from, $to),
+            // Meter 1 phase hanya punya jalur R; kolom S dan T tidak dirender.
+            'lines' => $selectedMeter?->isSinglePhase()
+                ? ['r' => 'R']
+                : ['r' => 'R', 's' => 'S', 't' => 'T'],
+            // Rentang data SESUNGGUHNYA yang tersimpan — beda dari $summary
+            // di atas yang cuma menggambarkan hasil filter tanggal.
+            'retentionRange' => $this->retention->rangeFor($selectedMeter),
+            'retentionMonths' => $this->retention->retentionMonths(),
+            'wouldPurgeCount' => $this->retention->wouldPurgeCount($selectedMeter),
             'exportQuery' => http_build_query([
                 'from' => $this->from,
                 'to' => $this->to,
                 'meter_id' => $this->meterId,
             ]),
         ]);
+    }
+
+    /**
+     * Hapus pembacaan mentah meter ini yang sudah lewat masa retensi, di
+     * luar jadwal mingguan — mis. saat butuh membebaskan ruang untuk satu
+     * meter tertentu sekarang juga. Memakai cutoff retensi yang sama persis
+     * dengan jadwal otomatis (bukan rentang bebas), supaya operator tidak
+     * bisa tidak sengaja menghapus data yang masih wajib disimpan.
+     */
+    public function purgeNow(): void
+    {
+        $this->authorize('reading.purge');
+
+        $meter = PowerMeter::findOrFail($this->meterId);
+        $deleted = $this->retention->purge($meter->id);
+
+        if ($deleted === 0) {
+            $this->dispatch('toast', type: 'info', message: 'Tidak ada data yang melewati masa retensi untuk meter ini.');
+
+            return;
+        }
+
+        ActivityLogger::log(
+            'pruned',
+            $meter,
+            "Hapus manual {$deleted} pembacaan mentah {$meter->code} (retensi {$this->retention->retentionMonths()} bulan)",
+        );
+
+        $this->dispatch('toast', type: 'success', message: "{$deleted} pembacaan lama untuk {$meter->code} dihapus.");
     }
 
     /**

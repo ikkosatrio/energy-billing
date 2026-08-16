@@ -166,7 +166,6 @@ class HistoryPage extends Component
             'peak_kw' => $peak?->peak_kw,
             'peak_at' => $peak?->peak_at,
             'load_factor' => $loadFactor,
-            'incomplete_days' => $dailies->filter->is_incomplete->count(),
         ];
     }
 }

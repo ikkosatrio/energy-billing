@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Customer;
 use App\Models\MeterTariffSchedule;
 use App\Models\PowerMeter;
+use App\Models\PowerMeterStatus;
 use App\Models\TariffGroup;
 use App\Services\Billing\InvoiceGenerator;
 use App\Services\Monitoring\DailyAggregationService;
@@ -68,11 +69,49 @@ class DemoDataSeeder extends Seeder
         app(\App\Services\SettingService::class)->put('iot_push_interval_seconds', self::READING_INTERVAL * 60);
 
         $meters = $this->createCustomers();
+        $this->createDeviceStatuses($meters);
         $this->createReadings($meters);
         $this->aggregate();
         $this->createInvoices();
 
         $this->command?->info('Data demo siap: 6 pelanggan, pembacaan 2 bulan, dan invoice bulan lalu.');
+    }
+
+    /**
+     * Kondisi terakhir perangkat — normalnya datang dari POST /api/v1/status.
+     * Dibuatkan di sini supaya kolom sinyal dan panel Informasi Perangkat tidak
+     * kosong saat data contoh dipakai untuk demo.
+     *
+     * @param  array<int, array{meter:PowerMeter, avgKw:float}>  $meters
+     */
+    private function createDeviceStatuses(array $meters): void
+    {
+        // Sengaja bervariasi dari kuat sampai sangat lemah agar seluruh tingkat
+        // batang sinyal terwakili.
+        $dbm = [-48, -63, -72, -81, -93, -57];
+
+        foreach ($meters as $index => $entry) {
+            $meter = $entry['meter'];
+            $tigaPhase = !$meter->isSinglePhase();
+
+            PowerMeterStatus::create([
+                'power_meter_id' => $meter->id,
+                'signal_dbm' => $dbm[$index % count($dbm)],
+                'ip_address' => '192.168.10.'.(21 + $index),
+                'mac_address' => sprintf('A4:CF:12:9B:00:%02X', $index + 1),
+                'firmware_version' => $index < 2 ? '1.4.2' : ($index < 4 ? '1.3.9' : '2.0.1'),
+                'active_power_kw' => $entry['avgKw'],
+                'voltage_r' => 229.6,
+                'voltage_s' => $tigaPhase ? 228.1 : null,
+                'voltage_t' => $tigaPhase ? 230.4 : null,
+                'current_r' => round($entry['avgKw'] * 1.6, 1),
+                'current_s' => $tigaPhase ? round($entry['avgKw'] * 1.55, 1) : null,
+                'current_t' => $tigaPhase ? round($entry['avgKw'] * 1.62, 1) : null,
+                'power_factor' => 0.92,
+                'frequency' => 50,
+                'read_at' => now()->toDateTimeString(),
+            ]);
+        }
     }
 
     /**
@@ -97,6 +136,9 @@ class DemoDataSeeder extends Seeder
                 'location' => $location,
                 'ct_ratio' => $kva > 500 ? '800/5' : '400/5',
                 'multiplier' => 1,
+                // Dua meter dibuat 1 phase supaya penyembunyian kolom S dan T
+                // di monitoring dan laporan ikut terlihat pada data contoh.
+                'phase' => str_starts_with($meterCode, 'DTS353') ? '1' : '3',
                 // Satu meter sengaja dibiarkan offline agar tampilan status
                 // dan peringatan di dashboard ikut terlihat.
                 'status' => $avgKw > 0 ? 'active' : 'maintenance',

@@ -73,8 +73,15 @@
                 <div class="stat-value sm" style="margin-top:8px">
                     {{ kwh($summary['kwh_lwbp'] + $summary['kwh_wbp'], 1) }} <small>kWh</small>
                 </div>
-                <div class="stat-foot">
-                    LWBP {{ kwh($summary['kwh_lwbp'], 1) }} · WBP {{ kwh($summary['kwh_wbp'], 1) }}
+                <div class="stat-split">
+                    <span class="stat-split-item">
+                        <span class="legend-swatch lwbp"></span>
+                        LWBP <strong>{{ kwh($summary['kwh_lwbp'], 1) }}</strong>
+                    </span>
+                    <span class="stat-split-item">
+                        <span class="legend-swatch wbp"></span>
+                        WBP <strong>{{ kwh($summary['kwh_wbp'], 1) }}</strong>
+                    </span>
                 </div>
             </div>
         </div>
@@ -86,6 +93,62 @@
                 bukan penjumlahan tiap pembacaan.
             </div>
         @endif
+
+        {{-- ── Retensi data mentah — rentang SESUNGGUHNYA, bukan hasil filter ── --}}
+        <div class="card mb-18">
+            <div class="card-title">Retensi Data Mentah</div>
+            <div class="card-sub" style="margin-bottom:14px">
+                Rentang yang benar-benar tersimpan untuk meter ini — beda dari filter tanggal di atas
+            </div>
+
+            <div class="stat-grid grid-1-1-1">
+                <div class="card">
+                    <div class="stat-label">Data Tersimpan</div>
+                    <div class="stat-value sm" style="margin-top:8px;font-size:15px">
+                        {{ $retentionRange['first_at']?->translatedFormat('d M Y') ?? '—' }}
+                        &nbsp;→&nbsp;
+                        {{ $retentionRange['last_at']?->translatedFormat('d M Y') ?? '—' }}
+                    </div>
+                    <div class="stat-foot">{{ number_format($retentionRange['count'], 0, ',', '.') }} baris pembacaan</div>
+                </div>
+                <div class="card">
+                    <div class="stat-label">Retensi Diatur</div>
+                    <div class="stat-value sm" style="margin-top:8px">{{ $retentionMonths }} <small>bulan</small></div>
+                    <div class="stat-foot">Diubah di Setting → Integrasi IoT</div>
+                </div>
+                <div class="card">
+                    <div class="stat-label">Akan Terhapus Jadwal Berikut</div>
+                    <div class="stat-value sm" style="margin-top:8px">
+                        {{ number_format($wouldPurgeCount, 0, ',', '.') }} <small>baris</small>
+                    </div>
+                    <div class="stat-foot {{ $wouldPurgeCount > 0 ? 'down' : 'up' }}">
+                        @if ($wouldPurgeCount > 0)
+                            Otomatis tiap Minggu 02:00 WIB
+                        @else
+                            Belum ada yang melewati masa retensi
+                        @endif
+                    </div>
+                </div>
+            </div>
+
+            @can('reading.purge')
+                @if ($wouldPurgeCount > 0)
+                    <div class="row" style="margin-top:14px">
+                        <button type="button" class="btn btn-ghost btn-sm" style="color:var(--danger)"
+                                x-on:click="ConfirmDialog.show({
+                                        title: 'Hapus data lama sekarang?',
+                                        text: '{{ number_format($wouldPurgeCount, 0, ',', '.') }} pembacaan sebelum cutoff retensi ({{ $retentionMonths }} bulan) akan dihapus permanen dari meter ini. Agregat harian tidak ikut terhapus, jadi laporan dan tagihan lama tetap utuh.',
+                                        danger: true,
+                                        confirmText: 'Ya, Hapus Sekarang',
+                                        onConfirm: () => $wire.purgeNow(),
+                                    })">
+                            <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+                            Hapus {{ number_format($wouldPurgeCount, 0, ',', '.') }} Baris Lama Sekarang
+                        </button>
+                    </div>
+                @endif
+            @endcan
+        </div>
 
         {{-- ── Tabel ───────────────────────────────────────────────────── --}}
         <div class="card">
@@ -99,8 +162,12 @@
                             <th class="num">Stand WBP</th>
                             <th class="num">Δ WBP</th>
                             <th class="num">Daya (kW)</th>
-                            <th class="num">Tegangan R</th>
-                            <th class="num">Arus R</th>
+                            @foreach ($lines as $label)
+                                <th class="num">Tegangan {{ $label }}</th>
+                            @endforeach
+                            @foreach ($lines as $label)
+                                <th class="num">Arus {{ $label }}</th>
+                            @endforeach
                             <th class="num">PF</th>
                             <th>Sumber</th>
                             <th>Catatan</th>
@@ -122,8 +189,12 @@
                                     {{ $row['delta_wbp'] === null ? '—' : kwh($row['delta_wbp'], 2) }}
                                 </td>
                                 <td class="num">{{ $r->active_power_kw !== null ? kwh($r->active_power_kw, 1) : '—' }}</td>
-                                <td class="num">{{ $r->voltage_r !== null ? kwh($r->voltage_r, 1) : '—' }}</td>
-                                <td class="num">{{ $r->current_r !== null ? kwh($r->current_r, 1) : '—' }}</td>
+                                @foreach ($lines as $key => $label)
+                                    <td class="num">{{ $r->{'voltage_'.$key} !== null ? kwh($r->{'voltage_'.$key}, 1) : '—' }}</td>
+                                @endforeach
+                                @foreach ($lines as $key => $label)
+                                    <td class="num">{{ $r->{'current_'.$key} !== null ? kwh($r->{'current_'.$key}, 1) : '—' }}</td>
+                                @endforeach
                                 <td class="num">{{ $r->power_factor !== null ? number_format($r->power_factor, 2, ',', '.') : '—' }}</td>
                                 <td>
                                     <span class="badge {{ $r->source === 'api' ? 'badge-info' : 'badge-neutral' }}">
@@ -144,7 +215,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="11" class="table-empty">
+                                <td colspan="{{ 9 + count($lines) * 2 }}" class="table-empty">
                                     {{ $onlyAnomalies
                                         ? 'Tidak ada baris bermasalah pada halaman ini.'
                                         : 'Belum ada pembacaan pada rentang tanggal ini.' }}

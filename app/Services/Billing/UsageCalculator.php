@@ -3,6 +3,7 @@
 namespace App\Services\Billing;
 
 use App\Models\MeterReading;
+use App\Models\MeterReadingDaily;
 use App\Models\PowerMeter;
 use App\Services\Monitoring\ConsumptionCalculator;
 use Illuminate\Support\Carbon;
@@ -32,17 +33,37 @@ class UsageCalculator
      */
     public function forPeriod(PowerMeter $meter, Carbon $start, Carbon $end): array
     {
-        $first = MeterReading::where('power_meter_id', $meter->id)
-            ->firstFrom($start->copy()->startOfDay()->toDateTimeString())
-            ->where('read_at', '<=', $end->copy()->endOfDay()->toDateTimeString())
-            ->first();
-
         $last = MeterReading::where('power_meter_id', $meter->id)
             ->lastUntil($end->copy()->endOfDay()->toDateTimeString())
             ->where('read_at', '>=', $start->copy()->startOfDay()->toDateTimeString())
             ->first();
 
-        if (!$first || !$last) {
+        if (!$last) {
+            return $this->empty();
+        }
+
+        /*
+         * Stand awal diambil dari pembacaan TERAKHIR SEBELUM periode ini —
+         * yaitu stand akhir periode sebelumnya, sama seperti cara tagihan
+         * listrik pada umumnya.
+         *
+         * Memakai pembacaan pertama DI DALAM periode akan kehilangan pemakaian
+         * antara pergantian periode dan pembacaan pertama itu, dan membuat
+         * angkanya berbeda dengan jumlah agregat harian yang dipakai laporan.
+         *
+         * Pelanggan baru belum punya pembacaan sebelumnya; untuk mereka
+         * pembacaan pertama di dalam periode yang menjadi titik awal.
+         */
+        $first = MeterReading::where('power_meter_id', $meter->id)
+            ->where('read_at', '<', $start->copy()->startOfDay()->toDateTimeString())
+            ->orderByDesc('read_at')
+            ->first()
+            ?? MeterReading::where('power_meter_id', $meter->id)
+                ->firstFrom($start->copy()->startOfDay()->toDateTimeString())
+                ->where('read_at', '<=', $end->copy()->endOfDay()->toDateTimeString())
+                ->first();
+
+        if (!$first) {
             return $this->empty();
         }
 
@@ -51,26 +72,56 @@ class UsageCalculator
         $wbpStart = (float) $first->stand_wbp;
         $wbpEnd = (float) $last->stand_wbp;
 
-        // Stand yang mundur menandakan meter di-reset atau berputar kembali ke
-        // nol. Selisih stand awal-akhir tidak lagi mewakili pemakaian.
-        $reset = $lwbpEnd < $lwbpStart || $wbpEnd < $wbpStart;
+        /*
+         * Menentukan apakah selisih stand awal-akhir masih boleh dipercaya.
+         *
+         * Membandingkan stand pertama dengan stand terakhir saja TIDAK cukup.
+         * Meter yang di-reset berkali-kali dalam satu periode bisa berakhir di
+         * angka yang lebih tinggi daripada awalnya — misalnya 0 → naik → reset,
+         * berulang 100 kali, lalu berhenti di 20. Pemeriksaan akhir-vs-awal
+         * membacanya sebagai normal dan menagih 20 kWh dari 5.020 kWh yang
+         * sebenarnya terpakai.
+         *
+         * Karena itu agregat harian ikut diperiksa: kolom reset_count-nya
+         * dihitung dengan menelusuri seluruh pembacaan hari itu, jadi reset di
+         * tengah periode tetap tertangkap. Query-nya murah — satu baris per
+         * hari, bukan per pembacaan.
+         */
+        $daily = MeterReadingDaily::where('power_meter_id', $meter->id)
+            ->between($start->toDateString(), $end->toDateString())
+            ->selectRaw('COALESCE(SUM(reset_count), 0) AS resets, COUNT(*) AS hari')
+            ->first();
+
+        $reset = $lwbpEnd < $lwbpStart
+            || $wbpEnd < $wbpStart
+            || (int) ($daily->resets ?? 0) > 0
+            // Tanpa agregat harian, tidak ada cara murah memastikan tidak ada
+            // reset di tengah periode. Tempuh jalur teliti daripada menagih
+            // angka yang belum tentu benar.
+            || (int) ($daily->hari ?? 0) === 0;
 
         if ($reset) {
-            // Jalur lambat, hanya ditempuh saat ada reset: pemakaian dihitung
-            // dari penjumlahan selisih antar pembacaan sepanjang periode.
-            //
-            // Sebelumnya kasus ini menghasilkan 0 — pelanggan yang meternya
-            // sempat di-reset praktis tidak ditagih atas pemakaiannya.
+            // Jalur teliti: pemakaian dijumlahkan dari selisih antar pembacaan
+            // sepanjang periode, sehingga setiap reset ikut terhitung.
+            // Pembacaan pembuka ikut disertakan agar pemakaian di pergantian
+            // periode tidak hilang — sama seperti pada agregat harian.
             $usage = $this->consumption->fromReadings(
-                MeterReading::where('power_meter_id', $meter->id)
-                    ->between($start->copy()->startOfDay()->toDateTimeString(), $end->copy()->endOfDay()->toDateTimeString())
-                    ->orderBy('read_at')
-                    ->get(['read_at', 'stand_lwbp', 'stand_wbp']),
+                collect([$first])->concat(
+                    MeterReading::where('power_meter_id', $meter->id)
+                        ->between($start->copy()->startOfDay()->toDateTimeString(), $end->copy()->endOfDay()->toDateTimeString())
+                        ->orderBy('read_at')
+                        ->get(['read_at', 'stand_lwbp', 'stand_wbp'])
+                )->unique(fn ($r) => $r->read_at->toDateTimeString())->values(),
                 $meter->effective_stand_max,
             );
 
             $kwhLwbp = $usage['lwbp'];
             $kwhWbp = $usage['wbp'];
+
+            // Hanya ditandai bila memang ada stand yang mundur. Periode tanpa
+            // agregat harian menempuh jalur yang sama, tapi tidak perlu
+            // memunculkan peringatan reset pada invoice.
+            $reset = ($usage['reset_count'] + $usage['rollover_count']) > 0;
         } else {
             $kwhLwbp = $lwbpEnd - $lwbpStart;
             $kwhWbp = $wbpEnd - $wbpStart;

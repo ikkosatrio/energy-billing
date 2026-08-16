@@ -92,7 +92,6 @@ class ReportTest extends TestCase
         $this->assertNotNull($kosong);
         $this->assertEquals(0, $kosong['total_kwh']);
         $this->assertNull($kosong['peak_kw']);
-        $this->assertSame(0, $kosong['days']);
     }
 
     public function test_halaman_rekap_pemakaian_terbuka_saat_ada_pelanggan_tanpa_data(): void
@@ -161,10 +160,11 @@ class ReportTest extends TestCase
 
     // ── Laporan data mentah ──────────────────────────────────────────────
 
-    private function meterWithReadings(array $readings): PowerMeter
+    private function meterWithReadings(array $readings, string $phase = '3', string $code = 'MTR-RAW'): PowerMeter
     {
         $meter = PowerMeter::create([
-            'code' => 'MTR-RAW', 'name' => 'Panel Raw', 'multiplier' => 1, 'status' => 'active',
+            'code' => $code, 'name' => 'Panel Raw', 'multiplier' => 1, 'status' => 'active',
+            'phase' => $phase,
         ]);
 
         MeterReading::insert(array_map(fn ($r) => [
@@ -259,6 +259,62 @@ class ReportTest extends TestCase
         $this->get(route('report.export', ['type' => 'readings', 'format' => 'xlsx'])
             ."?from=2026-07-01&to=2026-07-01&meter_id={$meter->id}")
             ->assertOk();
+    }
+
+    public function test_export_data_mentah_tiga_phase_menyertakan_jalur_s_dan_t(): void
+    {
+        $meter = $this->meterWithReadings([['2026-07-01 10:00:00', 1000, 400]]);
+
+        $row = app(ReportService::class)
+            ->rawReadings($meter->id, Carbon::parse('2026-07-01'), Carbon::parse('2026-07-01'))
+            ->first();
+
+        $this->assertSame(
+            ['read_at', 'stand_lwbp', 'stand_wbp', 'delta_lwbp', 'delta_wbp', 'active_power_kw',
+                'voltage_r', 'voltage_s', 'voltage_t', 'current_r', 'current_s', 'current_t',
+                'power_factor', 'frequency', 'source', 'catatan'],
+            array_keys($row),
+        );
+    }
+
+    public function test_export_data_mentah_satu_phase_hanya_jalur_r(): void
+    {
+        $meter = $this->meterWithReadings([['2026-07-01 10:00:00', 1000, 400]], '1');
+
+        $row = app(ReportService::class)
+            ->rawReadings($meter->id, Carbon::parse('2026-07-01'), Carbon::parse('2026-07-01'))
+            ->first();
+
+        $this->assertSame(
+            ['read_at', 'stand_lwbp', 'stand_wbp', 'delta_lwbp', 'delta_wbp', 'active_power_kw',
+                'voltage_r', 'current_r', 'power_factor', 'frequency', 'source', 'catatan'],
+            array_keys($row),
+        );
+    }
+
+    /**
+     * Judul kolom harus sejalan dengan isinya — kalau tidak, angka tegangan
+     * dan arus tergeser satu kolom di berkas Excel.
+     */
+    public function test_judul_kolom_export_sejumlah_datanya(): void
+    {
+        foreach (['3' => 16, '1' => 12] as $phase => $expected) {
+            $meter = $this->meterWithReadings(
+                [['2026-07-01 10:00:00', 1000, 400]], $phase, "MTR-P{$phase}"
+            );
+
+            $row = app(ReportService::class)
+                ->rawReadings($meter->id, Carbon::parse('2026-07-01'), Carbon::parse('2026-07-01'))
+                ->first();
+
+            $this->assertCount($expected, $row, "phase {$phase}");
+
+            $controller = new \ReflectionMethod(\App\Http\Controllers\Report\ReportController::class, 'readingHeadings');
+            $controller->setAccessible(true);
+            $headings = $controller->invoke(app(\App\Http\Controllers\Report\ReportController::class), $meter->id);
+
+            $this->assertCount(count($row), $headings, "phase {$phase}");
+        }
     }
 
     public function test_export_data_mentah_wajib_menyertakan_meter(): void

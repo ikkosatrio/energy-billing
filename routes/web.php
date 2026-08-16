@@ -68,6 +68,16 @@ Route::middleware('auth')->group(function () {
 
         Route::get('payments', [PaymentController::class, 'index'])
             ->middleware('can:payment.view')->name('payments.index');
+
+        Route::get('payments/import-template', [PaymentController::class, 'template'])
+            ->middleware('can:payment.bulk')->name('payments.template');
+
+        Route::middleware('can:payment.receipt')->group(function () {
+            Route::get('payments/{payment}/receipt', [PaymentController::class, 'receipt'])
+                ->name('payments.receipt');
+            Route::get('payments/{payment}/receipt/preview', [PaymentController::class, 'receiptPreview'])
+                ->name('payments.receipt.preview');
+        });
     });
 
     // ── Master Data ──────────────────────────────────────────────────────
@@ -92,6 +102,7 @@ Route::middleware('auth')->group(function () {
     Route::prefix('report')->name('report.')->middleware('can:report.view')->group(function () {
         Route::get('usage', [ReportController::class, 'usage'])->name('usage');
         Route::get('billing', [ReportController::class, 'billing'])->name('billing');
+        Route::get('payments', [ReportController::class, 'payments'])->name('payments');
         Route::get('readings', [ReportController::class, 'readings'])->name('readings');
         Route::get('export/{type}/{format}', [ReportController::class, 'export'])->name('export');
     });

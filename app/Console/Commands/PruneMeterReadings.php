@@ -2,7 +2,8 @@
 
 namespace App\Console\Commands;
 
-use App\Models\MeterReading;
+use App\Services\ActivityLogger;
+use App\Services\Monitoring\DataRetentionService;
 use Illuminate\Console\Command;
 
 /**
@@ -16,9 +17,9 @@ class PruneMeterReadings extends Command
 
     protected $description = 'Menghapus pembacaan meter mentah yang sudah lewat masa retensi';
 
-    public function handle(): int
+    public function handle(DataRetentionService $retention): int
     {
-        $months = (int) ($this->option('months') ?: setting('iot_retention_months', 24));
+        $months = $this->option('months') !== null ? (int) $this->option('months') : $retention->retentionMonths();
 
         if ($months < 1) {
             $this->warn('Retensi tidak diatur (< 1 bulan). Tidak ada yang dihapus.');
@@ -26,17 +27,20 @@ class PruneMeterReadings extends Command
             return self::SUCCESS;
         }
 
-        $cutoff = now()->subMonths($months);
-        $total = 0;
-
-        // Dihapus bertahap agar tidak mengunci tabel terlalu lama —
-        // tabel ini bisa berisi jutaan baris.
-        do {
-            $deleted = MeterReading::where('read_at', '<', $cutoff)->limit(5000)->delete();
-            $total += $deleted;
-        } while ($deleted > 0);
+        $cutoff = $retention->cutoff($months);
+        $total = $retention->purge(months: $months);
 
         $this->info("{$total} pembacaan sebelum {$cutoff->toDateString()} dihapus.");
+
+        // Dicatat walau berjalan tanpa user (dari scheduler) — jejak audit
+        // untuk penghapusan massal ini tetap perlu terlihat di aplikasi,
+        // bukan cuma di output console server yang jarang ada yang membaca.
+        if ($total > 0) {
+            ActivityLogger::log(
+                'pruned',
+                description: "Hapus otomatis {$total} pembacaan mentah sebelum {$cutoff->toDateString()} (retensi {$months} bulan)",
+            );
+        }
 
         return self::SUCCESS;
     }

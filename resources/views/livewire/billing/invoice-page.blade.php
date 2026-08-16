@@ -55,12 +55,73 @@
         </div>
     </div>
 
+    {{-- ── Hasil operasi massal ────────────────────────────────────────── --}}
+    @if ($bulkResult)
+        <div class="alert {{ $bulkResult['skipped'] ? 'alert-warning' : 'alert-success' }} mb-18">
+            <div class="row" style="justify-content:space-between;align-items:flex-start;gap:16px">
+                <div>
+                    <strong>{{ $bulkResult['created'] }} invoice ditandai lunas</strong>
+                    — total {{ rupiah($bulkResult['total']) }}.
+
+                    @if ($bulkResult['skipped'])
+                        <div style="margin-top:8px">{{ count($bulkResult['skipped']) }} invoice dilewati:</div>
+                        <ul style="margin:4px 0 0;padding-left:18px">
+                            @foreach ($bulkResult['skipped'] as $reason)
+                                <li>{{ $reason }}</li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </div>
+                <div class="row nowrap" style="gap:8px">
+                    @if ($bulkResult['batch_id'])
+                        @can('payment.bulk')
+                            <button type="button" class="btn btn-outline btn-sm"
+                                    x-on:click="ConfirmDialog.show({
+                                            title: 'Batalkan pelunasan barusan?',
+                                            text: 'Seluruh {{ $bulkResult['created'] }} pembayaran dari operasi ini ditarik kembali dan status invoicenya dikembalikan.',
+                                            danger: true,
+                                            confirmText: 'Ya, Batalkan',
+                                            onConfirm: () => $wire.revertBulk({{ $bulkResult['batch_id'] }}),
+                                        })">
+                                <i data-lucide="undo-2" style="width:14px;height:14px"></i>
+                                Batalkan
+                            </button>
+                        @endcan
+                    @endif
+                    <button type="button" class="btn btn-ghost btn-sm" wire:click="$set('bulkResult', null)">Tutup</button>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- ── Tabel ───────────────────────────────────────────────────────── --}}
     <div class="card">
+        @can('payment.bulk')
+            @if ($selected)
+                <div class="bulk-bar">
+                    <span><strong>{{ count($selected) }}</strong> invoice dipilih</span>
+                    <div class="spacer"></div>
+                    <button type="button" class="btn btn-ghost btn-sm" wire:click="$set('selected', [])">
+                        Bersihkan
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" wire:click="openBulk">
+                        <i data-lucide="wallet" style="width:14px;height:14px"></i>
+                        Tandai Lunas
+                    </button>
+                </div>
+            @endif
+        @endcan
+
         <div class="table-wrap">
             <table class="table">
                 <thead>
                     <tr>
+                        @can('payment.bulk')
+                            <th style="width:34px">
+                                <input type="checkbox" title="Pilih semua yang bisa dibayar di halaman ini"
+                                       wire:click="toggleSelectAll" @checked($selected)>
+                            </th>
+                        @endcan
                         <th>No Invoice</th>
                         <th>Pelanggan</th>
                         <th>Meter</th>
@@ -75,7 +136,16 @@
                 </thead>
                 <tbody>
                     @forelse ($invoices as $invoice)
+                        @php $blocked = $bulkService->rejectionReason($invoice); @endphp
                         <tr class="clickable" wire:click="show({{ $invoice->id }})">
+                            @can('payment.bulk')
+                                <td wire:click.stop>
+                                    {{-- Invoice draft, batal, atau sudah lunas tidak bisa dicentang —
+                                         lebih jelas begini daripada dicentang lalu ditolak diam-diam. --}}
+                                    <input type="checkbox" value="{{ $invoice->id }}" wire:model.live="selected"
+                                           @disabled($blocked) title="{{ $blocked ? 'Tidak bisa dibayar — '.$blocked : '' }}">
+                                </td>
+                            @endcan
                             <td class="num strong" style="text-align:left;color:var(--primary)">{{ $invoice->invoice_no }}</td>
                             <td>{{ $invoice->customer_name }}</td>
                             <td class="num text-muted" style="text-align:left">{{ $invoice->meter_code ?? '—' }}</td>
@@ -97,7 +167,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="10" class="table-empty">
+                            <td colspan="{{ auth()->user()->hasPermission('payment.bulk') ? 11 : 10 }}" class="table-empty">
                                 {{ $search || $statusFilter || $periodFilter
                                     ? 'Tidak ada invoice yang cocok dengan filter.'
                                     : 'Belum ada invoice. Generate lewat menu Periode & Generate.' }}
@@ -130,6 +200,22 @@
                         {{ setting('company_domain') }}
                     </div>
                 </div>
+
+                @if ($detail->isCancelled())
+                    <div class="alert alert-danger" style="margin-top:18px">
+                        <strong>Invoice ini dibatalkan.</strong>
+                        Dokumennya tidak berlaku sebagai tagihan dan tidak bisa dikirim ke pelanggan.
+                        @if ($detail->cancelled_at)
+                            <div style="margin-top:6px;font-size:12px">
+                                Dibatalkan {{ $detail->cancelled_at->translatedFormat('d M Y, H:i') }}
+                                @if ($detail->cancelledBy) oleh {{ $detail->cancelledBy->name }} @endif
+                            </div>
+                        @endif
+                        @if ($detail->cancel_reason)
+                            <div style="margin-top:4px;font-size:12px">Alasan: {{ $detail->cancel_reason }}</div>
+                        @endif
+                    </div>
+                @endif
 
                 <div class="invoice-meta">
                     <div>
@@ -246,28 +332,62 @@
                         @endcan
                     @endif
 
-                    @can('invoice.send')
-                        <button type="button" class="btn btn-outline"
-                                wire:click="sendEmail({{ $detail->id }})"
-                                wire:loading.attr="disabled"
-                                wire:confirm="Kirim invoice {{ $detail->invoice_no }} ke email pelanggan?">
-                            <i data-lucide="mail" style="width:15px;height:15px"></i>
-                            <span wire:loading.remove wire:target="sendEmail">Kirim ke Pelanggan</span>
-                            <span wire:loading wire:target="sendEmail">Mengirim…</span>
-                        </button>
-                    @endcan
+                    {{-- Invoice batal tidak boleh dikirim: dokumennya sudah tidak berlaku. --}}
+                    @if (! $detail->isCancelled())
+                        @can('invoice.send')
+                            <button type="button" class="btn btn-outline"
+                                    wire:loading.attr="disabled"
+                                    x-on:click="ConfirmDialog.show({
+                                            title: 'Kirim invoice ' + @js($detail->invoice_no) + '?',
+                                            text: 'Terkirim ke email pelanggan yang terdaftar.',
+                                            confirmText: 'Ya, Kirim',
+                                            onConfirm: () => $wire.sendEmail({{ $detail->id }}),
+                                        })">
+                                <i data-lucide="mail" style="width:15px;height:15px"></i>
+                                <span wire:loading.remove wire:target="sendEmail">Kirim ke Pelanggan</span>
+                                <span wire:loading wire:target="sendEmail">Mengirim…</span>
+                            </button>
+                        @endcan
+                    @endif
 
                     <a href="{{ route('billing.invoices.download', $detail) }}" class="btn btn-outline">
                         <i data-lucide="download" style="width:15px;height:15px"></i>
                         Unduh PDF
                     </a>
 
-                    @if (!in_array($detail->status, ['paid', 'cancelled']))
+                    @if ($detail->isCancellable())
                         @can('invoice.delete')
                             <button type="button" class="btn btn-ghost" style="color:var(--danger)"
-                                    wire:click="cancel({{ $detail->id }})"
-                                    wire:confirm="Batalkan invoice {{ $detail->invoice_no }}?">
+                                    x-on:click="ConfirmDialog.show({
+                                            title: 'Batalkan invoice ' + @js($detail->invoice_no) + '?',
+                                            text: @js($detail->status === 'draft'
+                                                ? 'Invoice tetap tersimpan dengan nomor yang sama, tapi tidak lagi dihitung sebagai tagihan.'
+                                                : 'Invoice ini sudah terbit. Nomornya tetap dipakai, dan PDF-nya akan bertanda DIBATALKAN.'),
+                                            danger: true,
+                                            confirmText: 'Ya, Batalkan',
+                                            prompt: {
+                                                label: 'Alasan pembatalan (opsional)',
+                                                placeholder: 'Mis. salah stand meter, pelanggan pindah golongan…',
+                                            },
+                                            onConfirm: (reason) => $wire.cancel({{ $detail->id }}, reason),
+                                        })">
                                 Batalkan
+                            </button>
+                        @endcan
+                    @endif
+
+                    @if ($detail->isCancelled())
+                        @can('invoice.reopen')
+                            <button type="button" class="btn btn-ghost" style="color:var(--primary)"
+                                    x-on:click="ConfirmDialog.show({
+                                            title: 'Buka kembali invoice ' + @js($detail->invoice_no) + '?',
+                                            text: 'Invoice kembali menjadi draft dan harus diterbitkan ulang. Keterangan pembatalan pada dokumen akan dihapus.',
+                                            icon: 'rotate-ccw',
+                                            confirmText: 'Ya, Buka Kembali',
+                                            onConfirm: () => $wire.reopen({{ $detail->id }}),
+                                        })">
+                                <i data-lucide="rotate-ccw" style="width:15px;height:15px"></i>
+                                Buka Kembali
                             </button>
                         @endcan
                     @endif
@@ -276,6 +396,54 @@
                             wire:click="$set('detailId', null)">Tutup</button>
                 </div>
 
+            </div>
+        </div>
+    @endif
+
+    {{-- ── Pelunasan massal ────────────────────────────────────────────── --}}
+    @if ($showBulk)
+        <div class="modal-overlay" wire:click.self="$set('showBulk', false)">
+            <div class="modal modal-sm">
+                <div class="card-title" style="margin-bottom:6px">Tandai Lunas</div>
+                <div class="card-sub" style="margin-bottom:20px">
+                    {{ count($selected) }} invoice akan dicatat lunas sebesar <strong>sisa tagihannya
+                    masing-masing</strong>. Untuk pembayaran sebagian, catat satu per satu lewat menu Pembayaran.
+                </div>
+
+                <form wire:submit="bulkMarkPaid">
+                    <div class="field">
+                        <label class="field-label">Tanggal Bayar <span style="color:var(--danger)">*</span></label>
+                        <input type="date" class="input @error('bulkForm.payment_date') is-invalid @enderror"
+                               wire:model="bulkForm.payment_date">
+                        @error('bulkForm.payment_date') <div class="field-error">{{ $message }}</div> @enderror
+                    </div>
+
+                    <div class="field">
+                        <label class="field-label">Metode</label>
+                        <x-select-search wire:model="bulkForm.method"
+                            :options="[
+                                ['value' => 'transfer', 'label' => 'Transfer'],
+                                ['value' => 'cash', 'label' => 'Tunai'],
+                                ['value' => 'other', 'label' => 'Lainnya'],
+                            ]" />
+                    </div>
+
+                    <div class="field">
+                        <label class="field-label">Catatan</label>
+                        <textarea class="textarea" wire:model="bulkForm.notes"
+                                  placeholder="Mis. rekonsiliasi mutasi BCA 15 Agustus"></textarea>
+                        <div class="card-sub">Dicatat pada seluruh pembayaran dalam operasi ini.</div>
+                    </div>
+
+                    <div class="row" style="margin-top:24px">
+                        <button type="submit" class="btn btn-primary" wire:loading.attr="disabled">
+                            <i data-lucide="check" style="width:15px;height:15px"></i>
+                            <span wire:loading.remove wire:target="bulkMarkPaid">Tandai Lunas</span>
+                            <span wire:loading wire:target="bulkMarkPaid">Memproses…</span>
+                        </button>
+                        <button type="button" class="btn btn-outline" wire:click="$set('showBulk', false)">Batal</button>
+                    </div>
+                </form>
             </div>
         </div>
     @endif

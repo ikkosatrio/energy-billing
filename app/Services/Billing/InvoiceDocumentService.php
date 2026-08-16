@@ -42,6 +42,12 @@ class InvoiceDocumentService
      */
     public function email(Invoice $invoice, bool $queue = false): void
     {
+        // Dijaga di sini, bukan hanya di tombolnya: pengiriman otomatis saat
+        // generate dan route POST send juga lewat method ini.
+        if ($invoice->isCancelled()) {
+            throw new \RuntimeException('Invoice sudah dibatalkan dan tidak bisa dikirim.');
+        }
+
         $email = $invoice->customer?->email;
 
         if (!$email) {

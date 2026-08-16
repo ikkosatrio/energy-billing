@@ -5,16 +5,20 @@
   konsisten di dashboard, daftar invoice, dan halaman pembayaran.
 --}}
 @php
-    $map = [
-        'draft'     => ['Draft', 'badge-neutral'],
-        'issued'    => ['Belum Bayar', 'badge-warning'],
-        'partial'   => ['Bayar Sebagian', 'badge-info'],
-        'paid'      => ['Lunas', 'badge-success'],
-        'overdue'   => ['Jatuh Tempo', 'badge-danger'],
-        'cancelled' => ['Dibatalkan', 'badge-neutral'],
+    // Labelnya diambil dari Invoice::STATUS_LABELS — satu-satunya sumber,
+    // supaya export Excel/PDF (yang tidak bisa memanggil komponen ini) tetap
+    // menampilkan teks yang sama persis dengan yang terlihat di layar.
+    $badgeClass = [
+        'draft' => 'badge-neutral',
+        'issued' => 'badge-warning',
+        'partial' => 'badge-info',
+        'paid' => 'badge-success',
+        'overdue' => 'badge-danger',
+        'cancelled' => 'badge-neutral',
     ];
 
-    [$label, $class] = $map[$status] ?? [$status, 'badge-neutral'];
+    $label = \App\Models\Invoice::STATUS_LABELS[$status] ?? $status;
+    $class = $badgeClass[$status] ?? 'badge-neutral';
 @endphp
 
 <span class="badge {{ $class }}">{{ $label }}</span>

@@ -2,29 +2,60 @@
 
 namespace App\Livewire\Monitoring;
 
-use App\Models\MeterReading;
 use App\Models\PowerMeter;
-use App\Services\Monitoring\ConsumptionCalculator;
+use App\Services\Monitoring\UsageSummaryService;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Session;
 use Livewire\Component;
 
 /**
- * Kartu pembacaan terakhir tiap meter, disegarkan berkala lewat wire:poll.
+ * Kartu tiap meter: kondisi kelistrikan saat ini di bagian atas, akumulasi
+ * pemakaian dan biayanya di bagian bawah. Disegarkan berkala lewat wire:poll.
  */
 class RealtimePage extends Component
 {
-    /** Ambang "beban tinggi" dalam persen dari daya tersambung pelanggan. */
-    private const HIGH_LOAD_PERCENT = 80;
-
     /** Livewire tidak menyuntik lewat constructor; diambil dari container. */
-    private ConsumptionCalculator $consumption;
+    private UsageSummaryService $usage;
 
-    public function boot(ConsumptionCalculator $consumption): void
+    public function boot(UsageSummaryService $usage): void
     {
-        $this->consumption = $consumption;
+        $this->usage = $usage;
     }
 
-    public bool $autoRefresh = true;
+    /**
+     * Pilihan jeda penyegaran, dalam detik. `0` berarti manual — tidak ada
+     * polling sama sekali.
+     *
+     * Labelnya pendek supaya muat sebagai tombol berderet; nilainya selalu
+     * detik karena itu yang dimengerti wire:poll.
+     */
+    public const REFRESH_OPTIONS = [
+        5 => '5s',
+        10 => '10s',
+        30 => '30s',
+        60 => '1m',
+        300 => '5m',
+        600 => '10m',
+    ];
+
+    /**
+     * Disimpan di sesi supaya pilihannya bertahan saat pindah halaman dan
+     * kembali lagi — memilih ulang tiap kali membuka halaman ini melelahkan.
+     */
+    #[Session(key: 'realtime.refresh')]
+    public int $refreshEvery = 30;
+
+    /** Kosong = semua jenis sambungan. */
+    public string $phaseFilter = '';
+
+    public function updatedRefreshEvery(int $value): void
+    {
+        // Nilai di luar daftar hanya bisa datang dari payload yang dikarang;
+        // dikembalikan ke manual daripada dipakai sebagai jeda polling.
+        if ($value !== 0 && !array_key_exists($value, self::REFRESH_OPTIONS)) {
+            $this->refreshEvery = 0;
+        }
+    }
 
     #[On('refresh-realtime')]
     public function refresh(): void
@@ -36,80 +67,38 @@ class RealtimePage extends Component
     public function render()
     {
         $meters = PowerMeter::query()
-            ->with(['customer:id,power_meter_id,name,daya_kva', 'latestReading'])
+            ->with(['customer:id,power_meter_id,name,daya_kva,tariff_group_id', 'latestReading', 'deviceStatus'])
             ->where('status', '!=', 'inactive')
+            ->when($this->phaseFilter, fn ($q) => $q->where('phase', $this->phaseFilter))
             ->orderBy('name')
             ->get();
 
         return view('livewire.monitoring.realtime-page', [
             'meters' => $meters,
-            'cards' => $meters->map(fn ($meter) => $this->buildCard($meter)),
-            'todayUsage' => $this->todayUsage($meters->pluck('id')->all()),
-            'pollInterval' => max(15, (int) setting('iot_push_interval_seconds', 60)).'s',
+            'cards' => $meters->map(fn ($meter) => $meter->statusBadge())->all(),
+            'usage' => $this->usage->forMeters($meters),
+            'phaseCounts' => $this->phaseCounts(),
         ]);
     }
 
     /**
-     * Menentukan label status kartu. "Beban tinggi" hanya bisa dinilai bila
-     * pelanggan mencantumkan daya tersambung.
+     * Jumlah meter per jenis sambungan, dipakai sebagai label pada filter
+     * supaya terlihat ada berapa sebelum filternya dipilih.
      *
-     * @return array{status:string, badge:string}
+     * @return array{1:int, 3:int, all:int}
      */
-    private function buildCard(PowerMeter $meter): array
+    private function phaseCounts(): array
     {
-        if (!$meter->isOnline()) {
-            return ['status' => $meter->status === 'maintenance' ? 'Maintenance' : 'Offline',
-                'badge' => $meter->status === 'maintenance' ? 'badge-warning' : 'badge-danger'];
-        }
+        $counts = PowerMeter::query()
+            ->where('status', '!=', 'inactive')
+            ->selectRaw('phase, COUNT(*) AS jumlah')
+            ->groupBy('phase')
+            ->pluck('jumlah', 'phase');
 
-        $kw = (float) ($meter->latestReading?->active_power_kw ?? 0);
-        $kva = (float) ($meter->customer?->daya_kva ?? 0);
-
-        if ($kva > 0 && $kw >= $kva * (self::HIGH_LOAD_PERCENT / 100)) {
-            return ['status' => 'Beban Tinggi', 'badge' => 'badge-warning'];
-        }
-
-        return ['status' => 'Normal', 'badge' => 'badge-success'];
-    }
-
-    /**
-     * Pemakaian kWh hari ini per meter, dihitung dari selisih stand pertama
-     * dan terakhir hari ini — bukan dari agregat harian, yang baru terisi
-     * setelah job agregasi berjalan.
-     *
-     * @param  array<int>  $meterIds
-     * @return array<int, float>
-     */
-    private function todayUsage(array $meterIds): array
-    {
-        if (empty($meterIds)) {
-            return [];
-        }
-
-        // Dihitung di PHP agar reset meter tidak menghasilkan angka raksasa —
-        // MAX(stand)-MIN(stand) di SQL akan membaca stand sebelum reset
-        // sebagai pemakaian.
-        //
-        // Halaman ini menampilkan seluruh meter aktif sekaligus. Untuk jumlah
-        // meter yang jauh lebih besar, sumber datanya sebaiknya dipindah ke
-        // agregat harian agar tidak memuat pembacaan sehari penuh tiap polling.
-        $readings = MeterReading::query()
-            ->whereIn('power_meter_id', $meterIds)
-            ->between(now()->startOfDay()->toDateTimeString(), now()->toDateTimeString())
-            ->orderBy('read_at')
-            ->get(['power_meter_id', 'read_at', 'stand_lwbp', 'stand_wbp']);
-
-        // Titik putar tiap meter diambil sekali, lalu dipakai per kelompok.
-        $rolloverAt = PowerMeter::whereIn('id', $meterIds)
-            ->get(['id', 'stand_max', 'multiplier'])
-            ->mapWithKeys(fn ($m) => [$m->id => $m->effective_stand_max]);
-
-        return $readings->groupBy('power_meter_id')
-            ->map(function ($rows, $meterId) use ($rolloverAt) {
-                $usage = $this->consumption->fromReadings($rows, $rolloverAt[$meterId] ?? null);
-
-                return $usage['lwbp'] + $usage['wbp'];
-            })
-            ->all();
+        return [
+            '1' => (int) ($counts['1'] ?? 0),
+            '3' => (int) ($counts['3'] ?? 0),
+            'all' => (int) $counts->sum(),
+        ];
     }
 }

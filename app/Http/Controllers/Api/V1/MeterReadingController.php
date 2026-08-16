@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\StoreDeviceStatusRequest;
 use App\Http\Requests\Api\StoreMeterReadingRequest;
 use App\Models\PowerMeter;
+use App\Services\Monitoring\DeviceStatusService;
 use App\Services\Monitoring\ReadingIngestService;
 use Illuminate\Http\JsonResponse;
 use OpenApi\Attributes as OA;
@@ -15,8 +17,10 @@ use OpenApi\Attributes as OA;
 )]
 class MeterReadingController extends Controller
 {
-    public function __construct(private readonly ReadingIngestService $ingest)
-    {
+    public function __construct(
+        private readonly ReadingIngestService $ingest,
+        private readonly DeviceStatusService $deviceStatus,
+    ) {
     }
 
     #[OA\Post(
@@ -127,6 +131,101 @@ class MeterReadingController extends Controller
             'duplicate' => $result['duplicate'],
             'latest_read_at' => $result['latest_read_at'],
         ], 201);
+    }
+
+    #[OA\Post(
+        path: '/api/v1/status',
+        operationId: 'storeDeviceStatus',
+        summary: 'Kirim kondisi terakhir perangkat',
+        description: <<<'TXT'
+        Menimpa kondisi terakhir sebuah meter — **tidak dicatat sebagai riwayat**.
+
+        Isinya sama seperti payload pembacaan, ditambah informasi perangkat:
+        kekuatan sinyal WiFi, IP, MAC address, dan versi firmware.
+
+        Bedanya dengan `/readings`:
+
+        | | `/readings` | `/status` |
+        |---|---|---|
+        | Disimpan | bertambah sebagai riwayat | menimpa satu baris |
+        | Dipakai untuk | dasar perhitungan tagihan | mengetahui kondisi sekarang |
+
+        Kiriman status juga menandai perangkat masih hidup, sehingga gateway
+        yang mengirim status lebih sering daripada pembacaan tetap terbaca
+        online.
+
+        Field yang tidak dikirim dibiarkan apa adanya, tidak dikosongkan —
+        gateway boleh mengirim status ringkas tanpa menghapus nilai yang sudah
+        tercatat.
+        TXT,
+        security: [['ApiToken' => []]],
+        tags: ['Meter Readings'],
+    )]
+    #[OA\RequestBody(
+        required: true,
+        content: new OA\JsonContent(
+            ref: '#/components/schemas/DeviceStatusRequest',
+            examples: [
+                'lengkap' => new OA\Examples(
+                    example: 'lengkap',
+                    summary: 'Kondisi lengkap — perangkat + kelistrikan',
+                    value: [
+                        'meter_id' => 1,
+                        'signal_dbm' => -62,
+                        'ip_address' => '192.168.1.50',
+                        'mac_address' => 'A4:CF:12:9B:7E:01',
+                        'firmware_version' => '2.4.1',
+                        'read_at' => '2026-08-13T10:35:00+07:00',
+                        'stand_lwbp' => 1270280.5,
+                        'stand_wbp' => 414260.2,
+                        'active_power_kw' => 412.6,
+                        'voltage_r' => 380.1,
+                        'voltage_s' => 379.8,
+                        'voltage_t' => 380.4,
+                        'current_r' => 410.2,
+                        'current_s' => 415.1,
+                        'current_t' => 408.9,
+                        'power_factor' => 0.95,
+                        'frequency' => 50,
+                    ],
+                ),
+                'perangkat-saja' => new OA\Examples(
+                    example: 'perangkat-saja',
+                    summary: 'Perangkat saja — nilai kelistrikan tidak diubah',
+                    value: [
+                        'meter_id' => 1,
+                        'signal_dbm' => -71,
+                        'ip_address' => '192.168.1.50',
+                        'firmware_version' => '2.4.2',
+                    ],
+                ),
+            ],
+        ),
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Kondisi perangkat diperbarui.',
+        content: new OA\JsonContent(ref: '#/components/schemas/DeviceStatusResult'),
+    )]
+    #[OA\Response(response: 401, description: 'API token tidak valid.', content: new OA\JsonContent(ref: '#/components/schemas/ErrorMessage'))]
+    #[OA\Response(response: 403, description: 'Meter berstatus nonaktif.', content: new OA\JsonContent(ref: '#/components/schemas/ErrorMessage'))]
+    #[OA\Response(response: 422, description: 'Payload tidak valid.', content: new OA\JsonContent(ref: '#/components/schemas/ValidationError'))]
+    public function status(StoreDeviceStatusRequest $request): JsonResponse
+    {
+        $meter = PowerMeter::findOrFail($request->validated('meter_id'));
+
+        if ($meter->status === 'inactive') {
+            return response()->json(['message' => 'Meter berstatus nonaktif.'], 403);
+        }
+
+        $status = $this->deviceStatus->store($meter, $request->validated());
+
+        return response()->json([
+            'message' => 'Kondisi perangkat diperbarui.',
+            'meter_id' => $meter->id,
+            'meter_code' => $meter->code,
+            'updated_at' => $status->updated_at?->toIso8601String(),
+        ]);
     }
 
     #[OA\Get(

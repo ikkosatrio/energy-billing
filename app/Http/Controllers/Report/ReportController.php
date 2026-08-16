@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Report;
 
 use App\Exports\ReportExport;
 use App\Http\Controllers\Controller;
+use App\Models\PowerMeter;
 use App\Services\Report\ReportService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -26,6 +27,11 @@ class ReportController extends Controller
         return view('report.billing.index');
     }
 
+    public function payments()
+    {
+        return view('report.payments.index');
+    }
+
     public function readings()
     {
         return view('report.readings.index');
@@ -41,7 +47,7 @@ class ReportController extends Controller
     {
         $this->authorize('report.export');
 
-        abort_unless(in_array($type, ['usage', 'billing', 'readings'], true), 404);
+        abort_unless(in_array($type, ['usage', 'billing', 'payments', 'readings'], true), 404);
         abort_unless(in_array($format, ['xlsx', 'pdf'], true), 404);
 
         // Data mentah hanya masuk akal sebagai Excel — ribuan baris tidak
@@ -52,6 +58,8 @@ class ReportController extends Controller
             'from' => ['required', 'date'],
             'to' => ['required', 'date', 'after_or_equal:from'],
             'customer_id' => ['nullable', 'integer'],
+            'method' => ['nullable', 'in:transfer,cash,other'],
+            'partial_only' => ['nullable', 'boolean'],
             // Wajib untuk data mentah: tabelnya terlalu besar untuk dibaca
             // lintas meter sekaligus.
             'meter_id' => [$type === 'readings' ? 'required' : 'nullable', 'integer', 'exists:power_meters,id'],
@@ -64,9 +72,23 @@ class ReportController extends Controller
         [$rows, $headings, $title] = match ($type) {
             'usage' => [$this->reports->usage($from, $to, $customerId), $this->usageHeadings(), 'Rekap Pemakaian kWh'],
             'billing' => [$this->reports->billing($from, $to, $customerId), $this->billingHeadings(), 'Rekap Tagihan & Penerimaan'],
+            'payments' => [
+                $this->reports->payments(
+                    $from, $to, $customerId,
+                    $validated['method'] ?? null,
+                    (bool) ($validated['partial_only'] ?? false),
+                )->map(fn ($row) => [
+                    ...$row,
+                    // Label, bukan slug status — konsisten dengan yang
+                    // terlihat di layar lewat <x-invoice-status>.
+                    'invoice_status' => \App\Models\Invoice::STATUS_LABELS[$row['invoice_status']] ?? $row['invoice_status'],
+                ]),
+                $this->paymentHeadings(),
+                'Laporan Pembayaran',
+            ],
             'readings' => [
                 $this->reports->rawReadings((int) $validated['meter_id'], $from, $to),
-                $this->readingHeadings(),
+                $this->readingHeadings((int) $validated['meter_id']),
                 'Data Meter Mentah',
             ],
         };
@@ -90,18 +112,31 @@ class ReportController extends Controller
     private function usageHeadings(): array
     {
         return ['Pelanggan', 'Kode', 'Meter', 'Golongan', 'LWBP (kWh)', 'WBP (kWh)',
-            'Total kWh', 'Beban Puncak (kW)', 'Hari Berdata', 'Tagihan (Rp)'];
+            'Total kWh', 'Beban Puncak (kW)', 'Tagihan (Rp)'];
     }
 
-    private function readingHeadings(): array
+    private function readingHeadings(int $meterId): array
     {
-        return ['Waktu Baca', 'Stand LWBP', 'Stand WBP', 'Δ LWBP', 'Δ WBP', 'Daya (kW)',
-            'Tegangan R', 'Arus R', 'Power Factor', 'Frekuensi', 'Sumber', 'Catatan'];
+        // Harus sama persis dengan kolom yang dibentuk ReportService::rawReadings.
+        $lines = PowerMeter::find($meterId)?->isSinglePhase() ? ['R'] : ['R', 'S', 'T'];
+
+        return array_merge(
+            ['Waktu Baca', 'Stand LWBP', 'Stand WBP', 'Δ LWBP', 'Δ WBP', 'Daya (kW)'],
+            array_map(fn ($line) => 'Tegangan '.$line, $lines),
+            array_map(fn ($line) => 'Arus '.$line, $lines),
+            ['Power Factor', 'Frekuensi', 'Sumber', 'Catatan'],
+        );
     }
 
     private function billingHeadings(): array
     {
         return ['No Invoice', 'Pelanggan', 'Periode', 'Tanggal Terbit', 'Jatuh Tempo',
             'Total kWh', 'Tagihan (Rp)', 'Dibayar (Rp)', 'Sisa (Rp)', 'Status'];
+    }
+
+    private function paymentHeadings(): array
+    {
+        return ['Tanggal Bayar', 'No Invoice', 'Pelanggan', 'Jumlah (Rp)', 'Metode',
+            'Dicatat Oleh', 'Sumber', 'Status Invoice', 'Sisa Invoice (Rp)'];
     }
 }

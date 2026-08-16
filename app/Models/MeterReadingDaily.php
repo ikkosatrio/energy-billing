@@ -15,9 +15,6 @@ class MeterReadingDaily extends Model
 {
     use HasFactory;
 
-    /** Jumlah pembacaan ideal dalam sehari pada interval 1 menit. */
-    public const EXPECTED_READINGS = 1440;
-
     protected $fillable = [
         'power_meter_id',
         'date',
@@ -60,10 +57,18 @@ class MeterReadingDaily extends Model
     /**
      * Menandai hari dengan data tidak lengkap, mis. gateway sempat offline.
      * Ambang 90% memberi toleransi untuk beberapa push yang gagal.
+     *
+     * Jumlah ideal dihitung dari interval push YANG DIKONFIGURASI, bukan
+     * diasumsikan 1 menit — sebelumnya konstan 1.440 di sini membuat SETIAP
+     * hari selalu ditandai tidak lengkap begitu gateway memakai interval
+     * lain (mis. 30 menit → wajar cuma 48 baris sehari, jauh di bawah 1.440).
      */
     public function getIsIncompleteAttribute(): bool
     {
-        return $this->reading_count < (self::EXPECTED_READINGS * 0.9);
+        $interval = max(1, (int) setting('iot_push_interval_seconds', 60));
+        $expected = max(1, (int) floor(86400 / $interval));
+
+        return $this->reading_count < ($expected * 0.9);
     }
 
     /**

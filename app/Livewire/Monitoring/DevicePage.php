@@ -2,8 +2,8 @@
 
 namespace App\Livewire\Monitoring;
 
-use App\Models\MeterReading;
 use App\Models\PowerMeter;
+use App\Services\Monitoring\UsageSummaryService;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -23,10 +23,10 @@ class DevicePage extends Component
         $this->resetPage();
     }
 
-    public function render()
+    public function render(UsageSummaryService $usageSummary)
     {
         $meters = PowerMeter::query()
-            ->with(['customer:id,power_meter_id,name', 'latestReading'])
+            ->with(['customer:id,power_meter_id,name', 'latestReading', 'deviceStatus'])
             ->where('status', '!=', 'inactive')
             ->orderBy('name')
             ->get();
@@ -39,42 +39,7 @@ class DevicePage extends Component
 
         return view('livewire.monitoring.device-page', [
             'meters' => $meters,
-            'todayCounts' => $this->todayReadingCounts($meters->pluck('id')->all()),
-            'expected' => $this->expectedReadingsToday(),
+            'todayUsage' => $usageSummary->liveToday($meters->pluck('id')->all()),
         ]);
-    }
-
-    /**
-     * Jumlah pembacaan yang masuk hari ini per meter — dibandingkan dengan
-     * jumlah yang seharusnya untuk mendeteksi data bolong.
-     *
-     * @param  array<int>  $meterIds
-     * @return array<int, int>
-     */
-    private function todayReadingCounts(array $meterIds): array
-    {
-        if (empty($meterIds)) {
-            return [];
-        }
-
-        return MeterReading::query()
-            ->whereIn('power_meter_id', $meterIds)
-            ->between(now()->startOfDay()->toDateTimeString(), now()->toDateTimeString())
-            ->selectRaw('power_meter_id, COUNT(*) AS jumlah')
-            ->groupBy('power_meter_id')
-            ->pluck('jumlah', 'power_meter_id')
-            ->map(fn ($v) => (int) $v)
-            ->all();
-    }
-
-    /**
-     * Perkiraan jumlah pembacaan yang seharusnya sudah masuk sejak tengah
-     * malam sampai sekarang, berdasarkan interval push yang dikonfigurasi.
-     */
-    private function expectedReadingsToday(): int
-    {
-        $interval = max(1, (int) setting('iot_push_interval_seconds', 60));
-
-        return max(1, (int) floor(now()->diffInSeconds(now()->copy()->startOfDay()) / $interval));
     }
 }

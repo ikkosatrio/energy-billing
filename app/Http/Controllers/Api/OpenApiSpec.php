@@ -71,7 +71,10 @@ use OpenApi\Attributes as OA;
     required: ['read_at', 'stand_lwbp', 'stand_wbp'],
     properties: [
         new OA\Property(property: 'read_at', type: 'string', format: 'date-time',
-            description: 'Waktu pembacaan di sisi meter. Sertakan offset zona waktu.',
+            description: 'Waktu pembacaan di sisi meter. Dua format diterima: ISO 8601 dengan offset '
+                .'(2026-08-13T10:35:00+07:00) atau "YYYY-MM-DD HH:MM:SS" (2026-08-13 10:35:00). '
+                .'Tanpa offset, waktu dibaca sebagai WIB (Asia/Jakarta) — bila jam perangkat memakai UTC, '
+                .'gunakan format ber-offset agar tidak tercatat mundur 7 jam.',
             example: '2026-08-13T10:35:00+07:00'),
         new OA\Property(property: 'stand_lwbp', type: 'number', format: 'float',
             description: 'Stand kumulatif register LWBP (kWh), bukan pemakaian per interval.',
@@ -108,7 +111,9 @@ use OpenApi\Attributes as OA;
             description: 'ID meter — kolom pertama pada halaman Power Meter Device, atau dari GET /api/v1/meters.',
             example: 1),
         new OA\Property(property: 'read_at', type: 'string', format: 'date-time',
-            description: 'Waktu pembacaan di sisi meter. Sertakan offset zona waktu.',
+            description: 'Waktu pembacaan di sisi meter. Dua format diterima: ISO 8601 dengan offset '
+                .'(2026-08-13T10:35:00+07:00) atau "YYYY-MM-DD HH:MM:SS" (2026-08-13 10:35:00). '
+                .'Tanpa offset, waktu dibaca sebagai WIB (Asia/Jakarta).',
             example: '2026-08-13T10:35:00+07:00'),
         new OA\Property(property: 'stand_lwbp', type: 'number', format: 'float',
             description: 'Stand kumulatif register LWBP (kWh).', example: 1270280.5),
@@ -140,7 +145,57 @@ use OpenApi\Attributes as OA;
     type: 'object',
 )]
 
+#[OA\Schema(
+    schema: 'DeviceStatusRequest',
+    title: 'Kondisi perangkat',
+    description: 'Informasi perangkat dan kondisi kelistrikan terakhir. Menimpa, tidak dicatat sebagai riwayat.',
+    required: ['meter_id'],
+    properties: [
+        new OA\Property(property: 'meter_id', type: 'integer',
+            description: 'ID meter dari halaman Power Meter Device.', example: 1),
+
+        new OA\Property(property: 'signal_dbm', type: 'integer', nullable: true,
+            description: 'Kekuatan sinyal WiFi dalam dBm. Selalu negatif; makin mendekati nol makin kuat.',
+            minimum: -120, maximum: 0, example: -62),
+        new OA\Property(property: 'ip_address', type: 'string', format: 'ipv4', nullable: true, example: '192.168.1.50'),
+        new OA\Property(property: 'mac_address', type: 'string', nullable: true,
+            description: 'Format dipisah titik dua atau tanda hubung.', example: 'A4:CF:12:9B:7E:01'),
+        new OA\Property(property: 'firmware_version', type: 'string', nullable: true, maxLength: 50, example: '2.4.1'),
+
+        new OA\Property(property: 'read_at', type: 'string', format: 'date-time', nullable: true,
+            description: 'Waktu menurut perangkat. Bila kosong, dipakai waktu server saat kiriman diterima. '
+                .'Dua format diterima: ISO 8601 dengan offset (2026-08-13T10:35:00+07:00) atau '
+                .'"YYYY-MM-DD HH:MM:SS" (2026-08-13 10:35:00) yang dibaca sebagai WIB (Asia/Jakarta).',
+            example: '2026-08-13T10:35:00+07:00'),
+        new OA\Property(property: 'stand_lwbp', type: 'number', format: 'float', nullable: true, example: 1270280.5),
+        new OA\Property(property: 'stand_wbp', type: 'number', format: 'float', nullable: true, example: 414260.2),
+        new OA\Property(property: 'active_power_kw', type: 'number', format: 'float', nullable: true, example: 412.6),
+        new OA\Property(property: 'voltage_r', type: 'number', format: 'float', nullable: true, example: 380.1),
+        new OA\Property(property: 'voltage_s', type: 'number', format: 'float', nullable: true,
+            description: 'Diabaikan untuk meter 1 phase.', example: 379.8),
+        new OA\Property(property: 'voltage_t', type: 'number', format: 'float', nullable: true,
+            description: 'Diabaikan untuk meter 1 phase.', example: 380.4),
+        new OA\Property(property: 'current_r', type: 'number', format: 'float', nullable: true, example: 410.2),
+        new OA\Property(property: 'current_s', type: 'number', format: 'float', nullable: true, example: 415.1),
+        new OA\Property(property: 'current_t', type: 'number', format: 'float', nullable: true, example: 408.9),
+        new OA\Property(property: 'power_factor', type: 'number', format: 'float', nullable: true, example: 0.95),
+        new OA\Property(property: 'frequency', type: 'number', format: 'float', nullable: true, example: 50),
+    ],
+    type: 'object',
+)]
+
 // ── Schema respons ───────────────────────────────────────────────────────
+
+#[OA\Schema(
+    schema: 'DeviceStatusResult',
+    title: 'Hasil pembaruan kondisi',
+    properties: [
+        new OA\Property(property: 'message', type: 'string', example: 'Kondisi perangkat diperbarui.'),
+        new OA\Property(property: 'meter_id', type: 'integer', example: 1),
+        new OA\Property(property: 'meter_code', type: 'string', example: 'AW9L-IRC38'),
+        new OA\Property(property: 'updated_at', type: 'string', format: 'date-time', nullable: true),
+    ],
+)]
 
 #[OA\Schema(
     schema: 'IngestResult',

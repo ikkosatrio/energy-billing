@@ -49,6 +49,16 @@ class SettingSeeder extends Seeder
         ['invoice_auto_issue', '0', 'boolean', 'billing', 'Terbitkan Invoice Otomatis'],
         ['invoice_auto_send', '0', 'boolean', 'billing', 'Kirim Email Otomatis'],
 
+        // --- Kuitansi ---
+        ['receipt_number_format', 'KW/{YYYY}/{MM}/{SEQ}', 'string', 'billing', 'Format Nomor Kuitansi'],
+        // Default mati: kuitansi baru terkirim bila operator menekan tombolnya.
+        ['receipt_auto_send', '0', 'boolean', 'billing', 'Kirim Kuitansi Otomatis'],
+        // Masa tunggu sebelum kuitansi dikirim otomatis. Bukan basa-basi:
+        // salah input pembayaran hampir selalu ketahuan dalam beberapa hari,
+        // dan menahan pengiriman selama itu jauh lebih murah daripada menarik
+        // kembali kuitansi yang sudah ada di tangan pelanggan.
+        ['receipt_auto_send_days', '3', 'number', 'billing', 'Kirim Kuitansi Setelah (hari)'],
+
         // --- Integrasi IoT ---
         ['iot_push_interval_seconds', '60', 'number', 'iot', 'Interval Push Gateway (detik)'],
         ['iot_offline_after_minutes', '5', 'number', 'iot', 'Meter Offline Setelah (menit)'],

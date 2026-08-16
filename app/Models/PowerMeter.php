@@ -20,12 +20,16 @@ class PowerMeter extends Model
      */
     public const OFFLINE_AFTER_MINUTES = 5;
 
+    /** Ambang "beban tinggi" dalam persen dari daya tersambung pelanggan. */
+    public const HIGH_LOAD_PERCENT = 80;
+
     protected $fillable = [
         'code',
         'name',
         'serial_no',
         'brand',
         'model',
+        'phase',
         'location',
         'ct_ratio',
         'multiplier',
@@ -45,6 +49,19 @@ class PowerMeter extends Model
     public function customer(): HasOne
     {
         return $this->hasOne(Customer::class);
+    }
+
+    /**
+     * Kondisi terakhir perangkat — ditimpa tiap kiriman status, tanpa riwayat.
+     *
+     * Sengaja TIDAK dinamai `status`: kolom `status` pada tabel ini sudah
+     * dipakai untuk status administratif (active/inactive/maintenance), dan
+     * Eloquent mendahulukan atribut daripada relasi — relasinya akan tertutup
+     * diam-diam tanpa pesan kesalahan.
+     */
+    public function deviceStatus(): HasOne
+    {
+        return $this->hasOne(PowerMeterStatus::class);
     }
 
     public function readings(): HasMany
@@ -98,9 +115,47 @@ class PowerMeter extends Model
             : (float) $this->stand_max * (float) $this->multiplier;
     }
 
+    /** Meter 1 phase hanya punya satu jalur tegangan dan arus. */
+    public function isSinglePhase(): bool
+    {
+        return $this->phase === '1';
+    }
+
+    public function getPhaseLabelAttribute(): string
+    {
+        return $this->isSinglePhase() ? '1 Phase' : '3 Phase';
+    }
+
     public function isOnline(): bool
     {
         return $this->connection_status === 'online';
+    }
+
+    /**
+     * Label status kartu monitoring: Normal, Beban Tinggi, Offline, atau
+     * Maintenance. Dipakai bersama oleh Real-time Monitoring dan ringkasan
+     * perangkat di Dashboard supaya kriterianya selalu sama persis di kedua
+     * tempat — perlu relasi `customer`, `deviceStatus`, dan `latestReading`
+     * sudah dimuat lebih dulu oleh pemanggil.
+     *
+     * @return array{status:string, badge:string}
+     */
+    public function statusBadge(): array
+    {
+        if (!$this->isOnline()) {
+            return $this->status === 'maintenance'
+                ? ['status' => 'Maintenance', 'badge' => 'badge-warning']
+                : ['status' => 'Offline', 'badge' => 'badge-danger'];
+        }
+
+        $kw = (float) ($this->deviceStatus?->active_power_kw ?? $this->latestReading?->active_power_kw ?? 0);
+        $kva = (float) ($this->customer?->daya_kva ?? 0);
+
+        if ($kva > 0 && $kw >= $kva * (self::HIGH_LOAD_PERCENT / 100)) {
+            return ['status' => 'Beban Tinggi', 'badge' => 'badge-warning'];
+        }
+
+        return ['status' => 'Normal', 'badge' => 'badge-success'];
     }
 
     public function scopeActive(Builder $query): Builder

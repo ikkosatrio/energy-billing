@@ -230,6 +230,43 @@ class MeterIngestTest extends TestCase
             ->assertJsonStructure(['message', 'errors']);
     }
 
+    /**
+     * Kontrak format waktu yang dijanjikan dokumentasi API.
+     *
+     * Gateway di lapangan mengirim salah satu dari dua bentuk ini, jadi
+     * keduanya dikunci di test agar tidak diam-diam hilang saat aturan
+     * validasi read_at diperketat.
+     */
+    public function test_read_at_menerima_format_tanggal_polos_dan_iso(): void
+    {
+        $meter = $this->meter();
+
+        $this->api()
+            ->postJson('/api/v1/readings', $this->payload($meter, '2026-08-13 10:35:00', 100, 50))
+            ->assertCreated();
+
+        $this->api()
+            ->postJson('/api/v1/readings', $this->payload($meter, '2026-08-13T11:35:00+07:00', 110, 55))
+            ->assertCreated();
+
+        $this->assertSame(2, MeterReading::where('power_meter_id', $meter->id)->count());
+    }
+
+    public function test_read_at_tanpa_offset_dibaca_sebagai_waktu_wib(): void
+    {
+        $meter = $this->meter();
+
+        $this->api()
+            ->postJson('/api/v1/readings', $this->payload($meter, '2026-08-13 10:35:00', 100, 50))
+            ->assertCreated();
+
+        $readAt = MeterReading::where('power_meter_id', $meter->id)->value('read_at');
+
+        // Tersimpan apa adanya sebagai jam WIB — bukan digeser ke UTC.
+        $this->assertSame('2026-08-13 10:35:00', $readAt->toDateTimeString());
+        $this->assertSame('Asia/Jakarta', $readAt->timezoneName);
+    }
+
     public function test_ping_mengembalikan_interval_push(): void
     {
         $this->api()->getJson('/api/v1/ping')

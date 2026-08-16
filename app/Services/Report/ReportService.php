@@ -4,8 +4,10 @@ namespace App\Services\Report;
 
 use App\Models\Customer;
 use App\Models\Invoice;
+use App\Models\InvoicePayment;
 use App\Models\MeterReading;
 use App\Models\MeterReadingDaily;
+use App\Models\PowerMeter;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -32,8 +34,7 @@ class ReportService
             ->selectRaw('power_meter_id,
                          SUM(kwh_lwbp) AS lwbp,
                          SUM(kwh_wbp) AS wbp,
-                         MAX(peak_kw) AS peak_kw,
-                         COUNT(*) AS hari')
+                         MAX(peak_kw) AS peak_kw')
             ->groupBy('power_meter_id')
             ->get()
             ->keyBy('power_meter_id');
@@ -64,7 +65,6 @@ class ReportService
                 'wbp' => $wbp,
                 'total_kwh' => $lwbp + $wbp,
                 'peak_kw' => $stat?->peak_kw !== null ? (float) $stat->peak_kw : null,
-                'days' => (int) ($stat?->hari ?? 0),
                 'billed' => (float) ($billed[$customer->id] ?? 0),
             ];
         });
@@ -97,6 +97,97 @@ class ReportService
                 'outstanding' => $invoice->outstanding,
                 'status' => $invoice->status,
             ]);
+    }
+
+    /**
+     * Transaksi pembayaran dalam satu rentang TANGGAL BAYAR — beda dari
+     * billing() yang berbasis tanggal terbit. Satu baris per pembayaran,
+     * bukan per invoice, karena satu invoice bisa dicicil berkali-kali dan
+     * tiap cicilan perlu terlihat sebagai baris tersendiri untuk ditelusuri.
+     */
+    public function payments(
+        Carbon $from,
+        Carbon $to,
+        ?int $customerId = null,
+        ?string $method = null,
+        bool $partialOnly = false,
+    ): Collection {
+        return InvoicePayment::query()
+            ->with([
+                'invoice:id,invoice_no,customer_id,customer_name,total_amount,paid_amount,status',
+                'recordedBy:id,name',
+                'batch:id,type',
+            ])
+            ->whereBetween('payment_date', [$from->toDateString(), $to->toDateString()])
+            ->when($customerId, fn ($q) => $q->whereHas('invoice', fn ($sub) => $sub->where('customer_id', $customerId)))
+            ->when($method, fn ($q) => $q->where('method', $method))
+            ->when($partialOnly, fn ($q) => $q->whereHas('invoice', fn ($sub) => $sub->where('status', 'partial')))
+            ->orderByDesc('payment_date')
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn (InvoicePayment $payment) => [
+                'payment_date' => $payment->payment_date,
+                'invoice_no' => $payment->invoice?->invoice_no,
+                'customer' => $payment->invoice?->customer_name,
+                'amount' => (float) $payment->amount,
+                'method' => $payment->method,
+                'recorded_by' => $payment->recordedBy?->name,
+                // Batch mengungkap asal-usul pembayaran — pembayaran individual
+                // yang tercatat lewat pelunasan massal atau impor berkas rawan
+                // terlewat saat ditelusuri satu-satu.
+                'source' => match ($payment->batch?->type) {
+                    'import' => 'Impor',
+                    'bulk' => 'Massal',
+                    default => 'Manual',
+                },
+                'invoice_status' => $payment->invoice?->status,
+                'invoice_outstanding' => $payment->invoice?->outstanding,
+            ]);
+    }
+
+    /**
+     * Ringkasan tunggakan HARI INI — sengaja tidak terikat rentang tanggal
+     * bayar pada payments(): pertanyaannya beda ("berapa yang masih harus
+     * ditagih sekarang" vs "berapa yang masuk pada rentang ini"), jadi
+     * jawabannya juga tidak boleh ikut kepotong filter tanggal itu.
+     *
+     * @return array{
+     *     partial: array{count:int, amount:float},
+     *     aging: array<string, array{label:string, count:int, amount:float}>
+     * }
+     */
+    public function paymentTracking(): array
+    {
+        $unpaid = Invoice::unpaid()->get(['id', 'due_date', 'total_amount', 'paid_amount', 'status']);
+        $partial = $unpaid->where('status', 'partial');
+
+        $buckets = [
+            'current' => ['label' => 'Belum Jatuh Tempo', 'count' => 0, 'amount' => 0.0],
+            'd1_30' => ['label' => '1–30 Hari', 'count' => 0, 'amount' => 0.0],
+            'd31_60' => ['label' => '31–60 Hari', 'count' => 0, 'amount' => 0.0],
+            'd60_plus' => ['label' => '> 60 Hari', 'count' => 0, 'amount' => 0.0],
+        ];
+
+        foreach ($unpaid as $invoice) {
+            $overdueDays = $invoice->due_date && $invoice->due_date->isPast()
+                ? $invoice->due_date->diffInDays(now())
+                : 0;
+
+            $bucket = match (true) {
+                $overdueDays <= 0 => 'current',
+                $overdueDays <= 30 => 'd1_30',
+                $overdueDays <= 60 => 'd31_60',
+                default => 'd60_plus',
+            };
+
+            $buckets[$bucket]['count']++;
+            $buckets[$bucket]['amount'] += $invoice->outstanding;
+        }
+
+        return [
+            'partial' => ['count' => $partial->count(), 'amount' => (float) $partial->sum('outstanding')],
+            'aging' => $buckets,
+        ];
     }
 
     /** Batas baris export data mentah, menjaga memori worker Excel. */
@@ -178,20 +269,37 @@ class ReportService
             ->limit(self::RAW_EXPORT_LIMIT)
             ->get();
 
-        return collect($this->flagAnomalies($readings))->map(fn ($row) => [
-            'read_at' => $row['reading']->read_at,
-            'stand_lwbp' => (float) $row['reading']->stand_lwbp,
-            'stand_wbp' => (float) $row['reading']->stand_wbp,
-            'delta_lwbp' => $row['delta_lwbp'],
-            'delta_wbp' => $row['delta_wbp'],
-            'active_power_kw' => $row['reading']->active_power_kw,
-            'voltage_r' => $row['reading']->voltage_r,
-            'current_r' => $row['reading']->current_r,
-            'power_factor' => $row['reading']->power_factor,
-            'frequency' => $row['reading']->frequency,
-            'source' => $row['reading']->source,
-            'catatan' => $row['stand_dropped'] ? 'Stand mundur' : ($row['has_gap'] ? 'Jeda data' : ''),
-        ]);
+        // Meter 1 phase tidak punya jalur S dan T, jadi kolomnya tidak ikut
+        // diekspor — sama seperti tampilan di layar.
+        $lines = PowerMeter::find($meterId)?->isSinglePhase() ? ['r'] : ['r', 's', 't'];
+
+        return collect($this->flagAnomalies($readings))->map(function ($row) use ($lines) {
+            $reading = $row['reading'];
+
+            $data = [
+                'read_at' => $reading->read_at,
+                'stand_lwbp' => (float) $reading->stand_lwbp,
+                'stand_wbp' => (float) $reading->stand_wbp,
+                'delta_lwbp' => $row['delta_lwbp'],
+                'delta_wbp' => $row['delta_wbp'],
+                'active_power_kw' => $reading->active_power_kw,
+            ];
+
+            foreach ($lines as $line) {
+                $data['voltage_'.$line] = $reading->{'voltage_'.$line};
+            }
+
+            foreach ($lines as $line) {
+                $data['current_'.$line] = $reading->{'current_'.$line};
+            }
+
+            return $data + [
+                'power_factor' => $reading->power_factor,
+                'frequency' => $reading->frequency,
+                'source' => $reading->source,
+                'catatan' => $row['stand_dropped'] ? 'Stand mundur' : ($row['has_gap'] ? 'Jeda data' : ''),
+            ];
+        });
     }
 
     /**

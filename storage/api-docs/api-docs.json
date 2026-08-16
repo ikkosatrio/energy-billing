@@ -150,6 +150,106 @@
                 ]
             }
         },
+        "/api/v1/status": {
+            "post": {
+                "tags": [
+                    "Meter Readings"
+                ],
+                "summary": "Kirim kondisi terakhir perangkat",
+                "description": "Menimpa kondisi terakhir sebuah meter — **tidak dicatat sebagai riwayat**.\n\nIsinya sama seperti payload pembacaan, ditambah informasi perangkat:\nkekuatan sinyal WiFi, IP, MAC address, dan versi firmware.\n\nBedanya dengan `/readings`:\n\n| | `/readings` | `/status` |\n|---|---|---|\n| Disimpan | bertambah sebagai riwayat | menimpa satu baris |\n| Dipakai untuk | dasar perhitungan tagihan | mengetahui kondisi sekarang |\n\nKiriman status juga menandai perangkat masih hidup, sehingga gateway\nyang mengirim status lebih sering daripada pembacaan tetap terbaca\nonline.\n\nField yang tidak dikirim dibiarkan apa adanya, tidak dikosongkan —\ngateway boleh mengirim status ringkas tanpa menghapus nilai yang sudah\ntercatat.",
+                "operationId": "storeDeviceStatus",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DeviceStatusRequest"
+                            },
+                            "examples": {
+                                "lengkap": {
+                                    "summary": "Kondisi lengkap — perangkat + kelistrikan",
+                                    "value": {
+                                        "meter_id": 1,
+                                        "signal_dbm": -62,
+                                        "ip_address": "192.168.1.50",
+                                        "mac_address": "A4:CF:12:9B:7E:01",
+                                        "firmware_version": "2.4.1",
+                                        "read_at": "2026-08-13T10:35:00+07:00",
+                                        "stand_lwbp": 1270280.5,
+                                        "stand_wbp": 414260.2,
+                                        "active_power_kw": 412.6,
+                                        "voltage_r": 380.1,
+                                        "voltage_s": 379.8,
+                                        "voltage_t": 380.4,
+                                        "current_r": 410.2,
+                                        "current_s": 415.1,
+                                        "current_t": 408.9,
+                                        "power_factor": 0.95,
+                                        "frequency": 50
+                                    }
+                                },
+                                "perangkat-saja": {
+                                    "summary": "Perangkat saja — nilai kelistrikan tidak diubah",
+                                    "value": {
+                                        "meter_id": 1,
+                                        "signal_dbm": -71,
+                                        "ip_address": "192.168.1.50",
+                                        "firmware_version": "2.4.2"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Kondisi perangkat diperbarui.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DeviceStatusResult"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "API token tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorMessage"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Meter berstatus nonaktif.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorMessage"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Payload tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ValidationError"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "ApiToken": []
+                    }
+                ]
+            }
+        },
         "/api/v1/meters": {
             "get": {
                 "tags": [
@@ -259,7 +359,7 @@
                 ],
                 "properties": {
                     "read_at": {
-                        "description": "Waktu pembacaan di sisi meter. Sertakan offset zona waktu.",
+                        "description": "Waktu pembacaan di sisi meter. Dua format diterima: ISO 8601 dengan offset (2026-08-13T10:35:00+07:00) atau \"YYYY-MM-DD HH:MM:SS\" (2026-08-13 10:35:00). Tanpa offset, waktu dibaca sebagai WIB (Asia/Jakarta) — bila jam perangkat memakai UTC, gunakan format ber-offset agar tidak tercatat mundur 7 jam.",
                         "type": "string",
                         "format": "date-time",
                         "example": "2026-08-13T10:35:00+07:00"
@@ -351,7 +451,7 @@
                         "example": 1
                     },
                     "read_at": {
-                        "description": "Waktu pembacaan di sisi meter. Sertakan offset zona waktu.",
+                        "description": "Waktu pembacaan di sisi meter. Dua format diterima: ISO 8601 dengan offset (2026-08-13T10:35:00+07:00) atau \"YYYY-MM-DD HH:MM:SS\" (2026-08-13 10:35:00). Tanpa offset, waktu dibaca sebagai WIB (Asia/Jakarta).",
                         "type": "string",
                         "format": "date-time",
                         "example": "2026-08-13T10:35:00+07:00"
@@ -444,6 +544,145 @@
                             "$ref": "#/components/schemas/ReadingItem"
                         },
                         "maxItems": 1000
+                    }
+                },
+                "type": "object"
+            },
+            "DeviceStatusRequest": {
+                "title": "Kondisi perangkat",
+                "description": "Informasi perangkat dan kondisi kelistrikan terakhir. Menimpa, tidak dicatat sebagai riwayat.",
+                "required": [
+                    "meter_id"
+                ],
+                "properties": {
+                    "meter_id": {
+                        "description": "ID meter dari halaman Power Meter Device.",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "signal_dbm": {
+                        "description": "Kekuatan sinyal WiFi dalam dBm. Selalu negatif; makin mendekati nol makin kuat.",
+                        "type": "integer",
+                        "maximum": 0,
+                        "minimum": -120,
+                        "example": -62,
+                        "nullable": true
+                    },
+                    "ip_address": {
+                        "type": "string",
+                        "format": "ipv4",
+                        "example": "192.168.1.50",
+                        "nullable": true
+                    },
+                    "mac_address": {
+                        "description": "Format dipisah titik dua atau tanda hubung.",
+                        "type": "string",
+                        "example": "A4:CF:12:9B:7E:01",
+                        "nullable": true
+                    },
+                    "firmware_version": {
+                        "type": "string",
+                        "maxLength": 50,
+                        "example": "2.4.1",
+                        "nullable": true
+                    },
+                    "read_at": {
+                        "description": "Waktu menurut perangkat. Bila kosong, dipakai waktu server saat kiriman diterima. Dua format diterima: ISO 8601 dengan offset (2026-08-13T10:35:00+07:00) atau \"YYYY-MM-DD HH:MM:SS\" (2026-08-13 10:35:00) yang dibaca sebagai WIB (Asia/Jakarta).",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2026-08-13T10:35:00+07:00",
+                        "nullable": true
+                    },
+                    "stand_lwbp": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 1270280.5,
+                        "nullable": true
+                    },
+                    "stand_wbp": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 414260.2,
+                        "nullable": true
+                    },
+                    "active_power_kw": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 412.6,
+                        "nullable": true
+                    },
+                    "voltage_r": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 380.1,
+                        "nullable": true
+                    },
+                    "voltage_s": {
+                        "description": "Diabaikan untuk meter 1 phase.",
+                        "type": "number",
+                        "format": "float",
+                        "example": 379.8,
+                        "nullable": true
+                    },
+                    "voltage_t": {
+                        "description": "Diabaikan untuk meter 1 phase.",
+                        "type": "number",
+                        "format": "float",
+                        "example": 380.4,
+                        "nullable": true
+                    },
+                    "current_r": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 410.2,
+                        "nullable": true
+                    },
+                    "current_s": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 415.1,
+                        "nullable": true
+                    },
+                    "current_t": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 408.9,
+                        "nullable": true
+                    },
+                    "power_factor": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 0.95,
+                        "nullable": true
+                    },
+                    "frequency": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 50,
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "DeviceStatusResult": {
+                "title": "Hasil pembaruan kondisi",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "Kondisi perangkat diperbarui."
+                    },
+                    "meter_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "meter_code": {
+                        "type": "string",
+                        "example": "AW9L-IRC38"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
                     }
                 },
                 "type": "object"

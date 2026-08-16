@@ -11,7 +11,28 @@
       "Bash(cp .env.example .env)",
       "Bash(sed -i '' 's/^DB_PORT=3306$/DB_PORT=3307/' .env)",
       "Bash(php artisan *)",
-      "Bash(php -r ' *)"
+      "Bash(php -r ' *)",
+      "Bash(php -l app/Http/Controllers/Report/ReportController.php)",
+      "Bash(php -l app/Services/Report/ReportService.php)",
+      "Bash(php -l resources/views/livewire/monitoring/history-page.blade.php)",
+      "Bash(php -l resources/views/livewire/monitoring/device-page.blade.php)",
+      "Bash(php -l app/Livewire/Monitoring/DevicePage.php)",
+      "Bash(php -l app/Services/Monitoring/UsageSummaryService.php)",
+      "Bash(grep -n 'PowerMeter::create\\\\|for \\($i\\\\|foreach' database/seeders/DemoDataSeeder.php)",
+      "Bash(php -l app/Models/Invoice.php)",
+      "Bash(php -l app/Livewire/Billing/InvoicePage.php)",
+      "Bash(php -l app/Services/Billing/InvoiceDocumentService.php)",
+      "Bash(php -l resources/views/billing/invoices/pdf.blade.php)",
+      "Bash(php -l resources/views/livewire/billing/invoice-page.blade.php)",
+      "Bash(php -l app/Livewire/Tariff/TariffSchedulePage.php)",
+      "Bash(php -l resources/views/livewire/tariff/tariff-schedule-page.blade.php)",
+      "Bash(php -l app/Http/Controllers/Api/OpenApiSpec.php)",
+      "Bash(perl -0pi -e 's/\\(\\\\Q->postJson\\('\\\\''\\\\/api\\\\/v1\\\\/readings'\\\\'', \\\\$this->payload\\(\\\\$meter, '\\\\''2026-08-13 10:35:00'\\\\'', 100, 50\\)\\)\\\\E\\\\n\\(\\\\s*\\)->assertOk\\\\\\(\\\\\\);\\)/$2->assertCreated\\(\\);/g' tests/Feature/MeterIngestTest.php)",
+      "Bash(php -l app/Helper/helper.php)",
+      "Bash(grep -rniE 'selected|bulkAction|selectAll|pilih semua|checkAll|\\\\$selected' app/Livewire resources/views)",
+      "Bash(php -l app/Livewire/Billing/PaymentPage.php)",
+      "Bash(php -l resources/views/livewire/billing/payment-page.blade.php)",
+      "Bash(php -l app/Services/Billing/BulkPaymentService.php)"
     ]
   }
 }

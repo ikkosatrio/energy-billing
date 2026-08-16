@@ -55,6 +55,11 @@
                     @php $total = $slot['lwbp'] + $slot['wbp']; @endphp
                     <div class="bar-col" title="{{ sprintf('%02d:00', $slot['hour']) }} — {{ kwh($total, 1) }} kWh">
                         <div class="bar-stack">
+                            {{-- Jam tanpa pemakaian dibiarkan kosong: deretan angka nol
+                                 hanya menutupi angka yang sebenarnya perlu dibaca. --}}
+                            @if ($total > 0)
+                                <div class="bar-value">{{ kwh_short($total) }}</div>
+                            @endif
                             <div class="bar wbp" style="height:{{ $slot['wbp'] / $hourlyMax * 100 }}%"></div>
                             <div class="bar lwbp" style="height:{{ $slot['lwbp'] / $hourlyMax * 100 }}%"></div>
                         </div>
@@ -82,22 +87,52 @@
             @else
                 <div class="bar-chart" style="height:200px">
                     @foreach ($dailies as $daily)
-                        <div class="bar-col" title="{{ $daily->date->translatedFormat('d M') }} — {{ kwh($daily->total_kwh, 1) }} kWh{{ $daily->is_incomplete ? ' (data tidak lengkap)' : '' }}">
+                        <div class="bar-col" title="{{ $daily->date->translatedFormat('d M') }} — {{ kwh($daily->total_kwh, 1) }} kWh">
                             <div class="bar-stack">
+                                @if ($daily->total_kwh > 0)
+                                    <div class="bar-value">{{ kwh_short($daily->total_kwh) }}</div>
+                                @endif
                                 <div class="bar wbp" style="height:{{ $daily->kwh_wbp / $dailyMax * 100 }}%"></div>
-                                <div class="bar lwbp" style="height:{{ $daily->kwh_lwbp / $dailyMax * 100 }}%;opacity:{{ $daily->is_incomplete ? .45 : 1 }}"></div>
+                                <div class="bar lwbp" style="height:{{ $daily->kwh_lwbp / $dailyMax * 100 }}%"></div>
                             </div>
                             <div class="bar-label">{{ $daily->date->day % 2 === 1 ? $daily->date->day : '' }}</div>
                         </div>
                     @endforeach
                 </div>
 
-                @if ($summary['incomplete_days'] > 0)
-                    <div class="alert alert-warning" style="margin-top:14px">
-                        {{ $summary['incomplete_days'] }} hari punya data tidak lengkap (gateway kemungkinan sempat offline).
-                        Batang yang lebih pudar menandai hari tersebut.
-                    </div>
-                @endif
+                {{-- Angka pastinya — bar chart di atas cuma untuk melihat bentuk
+                     sekilas, nilai LWBP/WBP/Total tiap hari tidak terbaca dari
+                     tingginya batang tanpa mengarahkan mouse satu-satu. --}}
+                <div class="table-wrap" style="margin-top:16px">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Tanggal</th>
+                                <th class="num">LWBP (kWh)</th>
+                                <th class="num">WBP (kWh)</th>
+                                <th class="num">Total (kWh)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($dailies as $daily)
+                                <tr>
+                                    <td class="mono">{{ $daily->date->translatedFormat('d M Y (D)') }}</td>
+                                    <td class="num">{{ kwh($daily->kwh_lwbp, 1) }}</td>
+                                    <td class="num">{{ kwh($daily->kwh_wbp, 1) }}</td>
+                                    <td class="num strong">{{ kwh($daily->total_kwh, 1) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                        <tfoot>
+                            <tr style="background:var(--bg-subtle);font-weight:700">
+                                <td>Total {{ $monthStart->translatedFormat('F') }}</td>
+                                <td class="num">{{ kwh($summary['lwbp'], 1) }}</td>
+                                <td class="num">{{ kwh($summary['wbp'], 1) }}</td>
+                                <td class="num">{{ kwh($summary['total'], 1) }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
             @endif
         </div>
 
@@ -110,7 +145,12 @@
                 <div class="bar-chart" style="height:180px;gap:8px">
                     @foreach ($monthly as $entry)
                         <div class="bar-col" title="{{ $entry['label'] }} — {{ kwh($entry['total'], 1) }} kWh">
-                            <div class="bar primary" style="height:{{ $entry['total'] / $monthMax * 100 }}%"></div>
+                            <div class="bar-stack">
+                                @if ($entry['total'] > 0)
+                                    <div class="bar-value">{{ kwh_short($entry['total']) }}</div>
+                                @endif
+                                <div class="bar primary" style="height:{{ $entry['total'] / $monthMax * 100 }}%"></div>
+                            </div>
                             <div class="bar-label">{{ $entry['label'] }}</div>
                         </div>
                     @endforeach
@@ -150,12 +190,13 @@
                         @endif
                     </span>
                 </div>
-                <div class="kv-row">
+                {{-- Load factor disembunyikan sementara --}}
+                {{-- <div class="kv-row">
                     <span class="kv-label">Load factor</span>
                     <span class="kv-value">
                         {{ $summary['load_factor'] !== null ? number_format($summary['load_factor'], 2, ',', '.') : '—' }}
                     </span>
-                </div>
+                </div> --}}
             </div>
         </div>
 

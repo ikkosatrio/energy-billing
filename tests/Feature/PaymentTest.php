@@ -170,6 +170,90 @@ class PaymentTest extends TestCase
             ->assertHasErrors(['form.amount']);
     }
 
+    // ── Auto-isi nominal & pratinjau sebelum simpan ─────────────────────
+
+    public function test_memilih_invoice_di_modal_mengisi_nominal_dengan_sisa_tagihan(): void
+    {
+        $invoice = $this->invoice(1_000_000);
+        InvoicePayment::create([
+            'invoice_id' => $invoice->id, 'payment_date' => '2026-08-01',
+            'amount' => 300_000, 'method' => 'transfer',
+        ]);
+
+        Livewire::test(PaymentPage::class)
+            ->call('create')
+            ->set('form.invoice_id', $invoice->id)
+            ->assertSet('form.amount', 700_000.0);
+    }
+
+    public function test_mengosongkan_pilihan_invoice_mengosongkan_nominal(): void
+    {
+        $invoice = $this->invoice(1_000_000);
+
+        Livewire::test(PaymentPage::class)
+            ->call('create')
+            ->set('form.invoice_id', $invoice->id)
+            ->set('form.invoice_id', null)
+            ->assertSet('form.amount', null);
+    }
+
+    public function test_pratinjau_menandai_pelunasan_penuh(): void
+    {
+        $invoice = $this->invoice(1_000_000);
+
+        Livewire::test(PaymentPage::class)
+            ->call('create')
+            ->set('form.invoice_id', $invoice->id)
+            ->set('form.amount', 1_000_000)
+            ->assertViewHas('formPreview', fn ($preview) => $preview['kind'] === 'settles');
+    }
+
+    public function test_pratinjau_menandai_bayar_sebagian(): void
+    {
+        $invoice = $this->invoice(1_000_000);
+
+        Livewire::test(PaymentPage::class)
+            ->call('create')
+            ->set('form.invoice_id', $invoice->id)
+            ->set('form.amount', 400_000)
+            ->assertViewHas('formPreview', fn ($preview) => $preview['kind'] === 'partial'
+                && $preview['remaining'] === 600_000.0);
+    }
+
+    public function test_pratinjau_menandai_lebih_bayar(): void
+    {
+        $invoice = $this->invoice(1_000_000);
+
+        Livewire::test(PaymentPage::class)
+            ->call('create')
+            ->set('form.invoice_id', $invoice->id)
+            ->set('form.amount', 1_200_000)
+            ->assertViewHas('formPreview', fn ($preview) => $preview['kind'] === 'overpaid'
+                && $preview['remaining'] === -200_000.0);
+    }
+
+    public function test_tanpa_nominal_pratinjau_tidak_tampil(): void
+    {
+        $invoice = $this->invoice(1_000_000);
+
+        Livewire::test(PaymentPage::class)
+            ->call('create')
+            ->set('form.invoice_id', $invoice->id)
+            ->set('form.amount', null)
+            ->assertViewHas('formPreview', null);
+    }
+
+    public function test_pratinjau_entri_cepat_ikut_sisa_tagihan(): void
+    {
+        $invoice = $this->invoice(1_000_000);
+
+        Livewire::test(PaymentPage::class)
+            ->set('quickInvoiceNo', $invoice->invoice_no)
+            ->set('quickAmount', 250_000)
+            ->assertViewHas('quickPreview', fn ($preview) => $preview['kind'] === 'partial'
+                && $preview['remaining'] === 750_000.0);
+    }
+
     public function test_pdf_invoice_bisa_dihasilkan(): void
     {
         $invoice = $this->invoice();

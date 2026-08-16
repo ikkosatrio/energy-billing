@@ -84,77 +84,9 @@
     </div>
   </div>
 
-  {{-- ── Status meter ────────────────────────────────────────────────── --}}
-  <div class="card mb-18">
-    <div class="card-head">
-      <div>
-        <div class="card-title">Status Meter</div>
-        <div class="card-sub">Daya aktif terakhir yang dikirim tiap perangkat</div>
-      </div>
-      @if (Route::has('monitoring.realtime') && auth()->user()->can('monitoring.view'))
-        <a href="{{ route('monitoring.realtime') }}" wire:navigate class="link-action">Lihat real-time →</a>
-      @endif
-    </div>
-
-    @forelse ($meters as $meter)
-      <div class="kv-row">
-        <div class="row" style="min-width:0">
-          <span class="pulse-dot{{ $meter->isOnline() ? '' : ' offline' }}"></span>
-          <div style="min-width:0">
-            <div style="font-size:13px;font-weight:600">{{ $meter->name }} — {{ $meter->code }}</div>
-            <div class="sub">{{ $meter->customer?->name ?? 'Belum terhubung ke pelanggan' }}</div>
-          </div>
-        </div>
-        <div class="kv-value">
-          {{ $meter->latestReading ? kwh($meter->latestReading->active_power_kw, 1).' kW' : '—' }}
-        </div>
-      </div>
-    @empty
-      <div class="table-empty">Belum ada power meter terdaftar.</div>
-    @endforelse
-  </div>
-
-  {{-- ── Invoice terbaru ─────────────────────────────────────────────── --}}
-  <div class="card">
-    <div class="card-head">
-      <div class="card-title">Invoice Terbaru</div>
-      @if (Route::has('billing.invoices.index') && auth()->user()->can('invoice.view'))
-        <a href="{{ route('billing.invoices.index') }}" wire:navigate class="link-action">Lihat semua →</a>
-      @endif
-    </div>
-
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>No Invoice</th>
-            <th>Pelanggan</th>
-            <th>Periode</th>
-            <th class="num">kWh</th>
-            <th class="num">Tagihan</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          @forelse ($recentInvoices as $invoice)
-            <tr>
-              <td class="num strong" style="text-align:left">{{ $invoice->invoice_no }}</td>
-              <td>{{ $invoice->customer_name }}</td>
-              <td class="text-muted">
-                {{ $invoice->period_start->translatedFormat('d M') }} – {{ $invoice->period_end->translatedFormat('d M Y') }}
-              </td>
-              <td class="num">{{ kwh($invoice->total_kwh) }}</td>
-              <td class="num strong">{{ rupiah($invoice->total_amount) }}</td>
-              <td><x-invoice-status :status="$invoice->status" /></td>
-            </tr>
-          @empty
-            <tr>
-              <td colspan="6" class="table-empty">Belum ada invoice yang digenerate.</td>
-            </tr>
-          @endforelse
-        </tbody>
-      </table>
-    </div>
-  </div>
+  {{-- ── Real-time perangkat ──────────────────────────────────────────── --}}
+  @can('monitoring.view')
+    <livewire:dashboard.device-status-widget />
+  @endcan
 
 @endsection

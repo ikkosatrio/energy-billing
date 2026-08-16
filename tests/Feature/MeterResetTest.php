@@ -11,6 +11,7 @@ use App\Models\MeterReadingDaily;
 use App\Models\PowerMeter;
 use App\Models\TariffGroup;
 use App\Services\Billing\InvoiceGenerator;
+use App\Services\Billing\UsageCalculator;
 use App\Services\Monitoring\ConsumptionCalculator;
 use App\Services\Monitoring\DailyAggregationService;
 use Database\Seeders\SettingSeeder;
@@ -138,9 +139,12 @@ class MeterResetTest extends TestCase
             ['power_meter_id' => $meter->id, 'read_at' => $today->copy()->addHours(4)->toDateTimeString(), 'stand_lwbp' => 80, 'stand_wbp' => 0, 'source' => 'api'],
         ]);
 
-        $usage = Livewire::test(RealtimePage::class)->viewData('todayUsage');
+        $usage = Livewire::test(RealtimePage::class)->viewData('usage');
 
-        $this->assertEquals(380, $usage[$meter->id]);
+        $this->assertEquals(380, $usage[$meter->id]['today']['kwh']);
+        // Reset hari ini tidak boleh ikut membengkakkan akumulasi di sebelahnya.
+        $this->assertEquals(380, $usage[$meter->id]['week']['kwh']);
+        $this->assertEquals(380, $usage[$meter->id]['month']['kwh']);
     }
 
     public function test_pembacaan_normal_hasilnya_sama_seperti_selisih_stand(): void
@@ -264,5 +268,203 @@ class MeterResetTest extends TestCase
 
         $this->assertEqualsWithDelta(129.99, $daily->kwh_lwbp, 0.01);
         $this->assertTrue($daily->has_reset);
+    }
+
+    // ── Reset berulang dalam satu periode ────────────────────────────────
+
+    /**
+     * Regresi: deteksi reset yang hanya membandingkan stand pertama dengan
+     * stand terakhir gagal total di sini.
+     *
+     * Meter di-reset 100 kali; stand terakhir (20) kebetulan LEBIH TINGGI
+     * daripada stand awal (0), sehingga pemeriksaan akhir-vs-awal membacanya
+     * sebagai normal dan menagih 20 kWh dari 5.020 kWh yang sebenarnya
+     * terpakai — kurang tagih 99,6% tanpa peringatan apa pun.
+     */
+    public function test_reset_berulang_yang_berakhir_di_stand_lebih_tinggi(): void
+    {
+        $meter = PowerMeter::create([
+            'code' => 'MTR-100', 'name' => 'Panel Sering Reset', 'multiplier' => 1, 'status' => 'active',
+        ]);
+
+        $rows = [];
+        $t = Carbon::parse('2026-07-01 00:00:00');
+        $rows[] = ['power_meter_id' => $meter->id, 'read_at' => $t->copy()->toDateTimeString(), 'stand_lwbp' => 0, 'stand_wbp' => 0, 'source' => 'api'];
+
+        // 100 siklus: naik 50 kWh lalu di-reset ke nol.
+        for ($i = 0; $i < 100; $i++) {
+            $t->addHours(3);
+            $rows[] = ['power_meter_id' => $meter->id, 'read_at' => $t->copy()->toDateTimeString(), 'stand_lwbp' => 50, 'stand_wbp' => 0, 'source' => 'api'];
+            $t->addHours(3);
+            $rows[] = ['power_meter_id' => $meter->id, 'read_at' => $t->copy()->toDateTimeString(), 'stand_lwbp' => 0, 'stand_wbp' => 0, 'source' => 'api'];
+        }
+
+        $t->addHours(3);
+        $rows[] = ['power_meter_id' => $meter->id, 'read_at' => $t->copy()->toDateTimeString(), 'stand_lwbp' => 20, 'stand_wbp' => 0, 'source' => 'api'];
+
+        foreach (array_chunk($rows, 300) as $chunk) {
+            MeterReading::insert($chunk);
+        }
+
+        // Agregasi harian berjalan lebih dulu, seperti scheduler di produksi.
+        $aggregator = app(DailyAggregationService::class);
+        for ($d = Carbon::parse('2026-07-01'); $d->lte(Carbon::parse('2026-07-31')); $d->addDay()) {
+            $aggregator->aggregate($meter, $d->copy());
+        }
+
+        $usage = app(UsageCalculator::class)->forPeriod(
+            $meter, Carbon::parse('2026-07-01'), Carbon::parse('2026-07-31'),
+        );
+
+        // Stand terakhir memang lebih tinggi dari stand awal.
+        $this->assertGreaterThan($usage['stand_lwbp_start'], $usage['stand_lwbp_end']);
+
+        $this->assertTrue($usage['meter_reset'], 'Reset di tengah periode harus tetap terdeteksi.');
+        $this->assertEquals(5020, $usage['kwh_lwbp']);
+    }
+
+    /**
+     * Tanpa agregat harian, tidak ada cara murah memastikan tidak ada reset di
+     * tengah periode — jalur teliti harus tetap ditempuh.
+     */
+    public function test_tanpa_agregat_harian_tetap_menempuh_jalur_teliti(): void
+    {
+        $meter = PowerMeter::create([
+            'code' => 'MTR-NOAGG', 'name' => 'Tanpa Agregat', 'multiplier' => 1, 'status' => 'active',
+        ]);
+
+        MeterReading::insert([
+            ['power_meter_id' => $meter->id, 'read_at' => '2026-07-01 00:00:00', 'stand_lwbp' => 0, 'stand_wbp' => 0, 'source' => 'api'],
+            ['power_meter_id' => $meter->id, 'read_at' => '2026-07-10 00:00:00', 'stand_lwbp' => 500, 'stand_wbp' => 0, 'source' => 'api'],
+            ['power_meter_id' => $meter->id, 'read_at' => '2026-07-11 00:00:00', 'stand_lwbp' => 0, 'stand_wbp' => 0, 'source' => 'api'],
+            ['power_meter_id' => $meter->id, 'read_at' => '2026-07-31 00:00:00', 'stand_lwbp' => 300, 'stand_wbp' => 0, 'source' => 'api'],
+        ]);
+
+        // Sengaja TIDAK menjalankan agregasi harian.
+        $usage = app(UsageCalculator::class)->forPeriod(
+            $meter, Carbon::parse('2026-07-01'), Carbon::parse('2026-07-31'),
+        );
+
+        $this->assertEquals(800, $usage['kwh_lwbp']);
+        $this->assertTrue($usage['meter_reset']);
+    }
+
+    /**
+     * Meter normal tidak boleh ikut ditandai reset hanya karena menempuh
+     * jalur teliti saat agregat harian belum ada.
+     */
+    public function test_meter_normal_tanpa_agregat_tidak_ditandai_reset(): void
+    {
+        $meter = PowerMeter::create([
+            'code' => 'MTR-NORM', 'name' => 'Normal', 'multiplier' => 1, 'status' => 'active',
+        ]);
+
+        MeterReading::insert([
+            ['power_meter_id' => $meter->id, 'read_at' => '2026-07-01 00:00:00', 'stand_lwbp' => 1000, 'stand_wbp' => 500, 'source' => 'api'],
+            ['power_meter_id' => $meter->id, 'read_at' => '2026-07-31 00:00:00', 'stand_lwbp' => 1240, 'stand_wbp' => 560, 'source' => 'api'],
+        ]);
+
+        $usage = app(UsageCalculator::class)->forPeriod(
+            $meter, Carbon::parse('2026-07-01'), Carbon::parse('2026-07-31'),
+        );
+
+        $this->assertEquals(240, $usage['kwh_lwbp']);
+        $this->assertEquals(60, $usage['kwh_wbp']);
+        $this->assertFalse($usage['meter_reset']);
+    }
+
+    // ── Konsistensi invoice vs laporan ───────────────────────────────────
+
+    /**
+     * Regresi: agregat harian sempat hanya menghitung dari pembacaan pertama
+     * sampai terakhir DI HARI ITU, sehingga pemakaian antara pembacaan
+     * terakhir kemarin dan pembacaan pertama hari ini tidak masuk ke hari mana
+     * pun. Hilangnya satu interval per hari — pada interval 30 menit itu 2%
+     * sebulan, dan membuat Rekap Pemakaian tidak sama dengan invoice.
+     *
+     * @dataProvider intervalProvider
+     */
+    public function test_jumlah_agregat_harian_sama_dengan_invoice(int $intervalMinutes, float $kwhPerInterval): void
+    {
+        $meter = PowerMeter::create([
+            'code' => 'MTR-SUM-'.$intervalMinutes, 'name' => 'Panel Konsisten',
+            'multiplier' => 1, 'status' => 'active',
+        ]);
+
+        // Rentang sengaja pendek (5 hari) agar test tetap ringan; yang diuji
+        // adalah kesinambungan di pergantian hari, dan itu sudah terwakili
+        // oleh beberapa batas tengah malam.
+        //
+        // Data dimulai sehari sebelumnya supaya ada pembacaan pembuka.
+        $rows = [];
+        $stand = 1000.0;
+        $t = Carbon::parse('2026-06-30 00:00:00');
+        $until = Carbon::parse('2026-07-05 23:59:00');
+
+        while ($t->lte($until)) {
+            $rows[] = [
+                'power_meter_id' => $meter->id,
+                'read_at' => $t->copy()->toDateTimeString(),
+                'stand_lwbp' => round($stand, 2),
+                'stand_wbp' => 0,
+                'source' => 'api',
+            ];
+            $stand += $kwhPerInterval;
+            $t->addMinutes($intervalMinutes);
+        }
+
+        foreach (array_chunk($rows, 500) as $chunk) {
+            MeterReading::insert($chunk);
+        }
+
+        $aggregator = app(DailyAggregationService::class);
+        for ($d = Carbon::parse('2026-07-01'); $d->lte(Carbon::parse('2026-07-05')); $d->addDay()) {
+            $aggregator->aggregate($meter, $d->copy());
+        }
+
+        $reportTotal = (float) MeterReadingDaily::where('power_meter_id', $meter->id)
+            ->between('2026-07-01', '2026-07-05')
+            ->sum('kwh_lwbp');
+
+        $invoice = app(UsageCalculator::class)->forPeriod(
+            $meter, Carbon::parse('2026-07-01'), Carbon::parse('2026-07-05'),
+        );
+
+        $this->assertEqualsWithDelta($invoice['kwh_lwbp'], $reportTotal, 0.01,
+            "Rekap Pemakaian harus sama dengan yang ditagihkan invoice (interval {$intervalMinutes} menit).");
+    }
+
+    public static function intervalProvider(): array
+    {
+        return [
+            'interval 30 menit' => [30, 30.0],
+            'interval 5 menit' => [5, 5.0],
+            'interval 1 menit' => [1, 1.0],
+        ];
+    }
+
+    /**
+     * reading_count harus tetap menghitung pembacaan hari itu saja, tidak ikut
+     * bertambah oleh pembacaan pembuka dari hari sebelumnya.
+     */
+    public function test_reading_count_tidak_ikut_menghitung_pembacaan_pembuka(): void
+    {
+        $meter = PowerMeter::create([
+            'code' => 'MTR-COUNT', 'name' => 'Panel Hitung', 'multiplier' => 1, 'status' => 'active',
+        ]);
+
+        MeterReading::insert([
+            ['power_meter_id' => $meter->id, 'read_at' => '2026-07-09 23:30:00', 'stand_lwbp' => 900, 'stand_wbp' => 0, 'source' => 'api'],
+            ['power_meter_id' => $meter->id, 'read_at' => '2026-07-10 00:00:00', 'stand_lwbp' => 930, 'stand_wbp' => 0, 'source' => 'api'],
+            ['power_meter_id' => $meter->id, 'read_at' => '2026-07-10 12:00:00', 'stand_lwbp' => 1000, 'stand_wbp' => 0, 'source' => 'api'],
+        ]);
+
+        app(DailyAggregationService::class)->aggregate($meter, Carbon::parse('2026-07-10'));
+
+        $daily = MeterReadingDaily::first();
+
+        $this->assertSame(2, $daily->reading_count);
+        // 30 kWh melewati tengah malam + 70 kWh siang hari.
+        $this->assertEquals(100, $daily->kwh_lwbp);
     }
 }

@@ -56,10 +56,18 @@
                             </span>
                         </div>
                     </div>
-                    <button type="button" class="btn btn-outline btn-sm" wire:click="addPeriod">
-                        <i data-lucide="plus" style="width:14px;height:14px"></i>
-                        Tambah Periode
-                    </button>
+                    <div class="row" style="gap:8px">
+                        @can('tariff.update')
+                            <button type="button" class="btn btn-outline btn-sm" wire:click="$set('showCopy', true)">
+                                <i data-lucide="copy" style="width:14px;height:14px"></i>
+                                Duplikat dari…
+                            </button>
+                        @endcan
+                        <button type="button" class="btn btn-outline btn-sm" wire:click="addPeriod">
+                            <i data-lucide="plus" style="width:14px;height:14px"></i>
+                            Tambah Periode
+                        </button>
+                    </div>
                 </div>
 
                 <div class="table-wrap">
@@ -191,6 +199,69 @@
                 </div>
             </div>
         </div>
+
+        {{-- ── Duplikat jadwal dari meter lain ─────────────────────────── --}}
+        @if ($showCopy)
+            <div class="modal-overlay" wire:click.self="$set('showCopy', false)">
+                <div class="modal">
+                    <div class="card-head" style="margin-bottom:18px">
+                        <div>
+                            <div class="card-title">Duplikat Jadwal</div>
+                            <div class="card-sub">
+                                Pilih meter yang jadwalnya ingin disalin ke
+                                <strong>{{ $meter?->code }}</strong>. Hasilnya masuk ke form dulu —
+                                belum tersimpan sampai Anda klik Simpan Jadwal.
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-ghost" wire:click="$set('showCopy', false)">Tutup</button>
+                    </div>
+
+                    @if ($copySources->isEmpty())
+                        <div class="table-empty">
+                            Belum ada meter lain yang punya jadwal tersimpan.
+                        </div>
+                    @else
+                        <div class="table-wrap">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Meter</th>
+                                        <th>Pelanggan</th>
+                                        <th>Jadwal</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($copySources as $source)
+                                        <tr>
+                                            <td class="strong">
+                                                {{ $source['name'] }}
+                                                <div class="sub mono">{{ $source['code'] }}</div>
+                                            </td>
+                                            <td class="text-muted">{{ $source['customer'] ?? '—' }}</td>
+                                            <td>
+                                                <div class="row" style="gap:6px;flex-wrap:wrap">
+                                                    @foreach ($source['periods'] as $period)
+                                                        <span class="badge badge-{{ strtolower($period['tariff_type']) }} badge-square mono">
+                                                            {{ $period['start_time'] }} {{ $period['tariff_type'] }}
+                                                        </span>
+                                                    @endforeach
+                                                </div>
+                                            </td>
+                                            <td class="text-right nowrap">
+                                                <span class="link-action" wire:click="copyFrom({{ $source['id'] }})">
+                                                    Gunakan
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    @endif
+                </div>
+            </div>
+        @endif
 
     @endif
 

@@ -25,9 +25,15 @@ class RolePermissionSeeder extends Seeder
             'invoice.generate' => 'Generate invoice periode',
             'invoice.update' => 'Ubah invoice',
             'invoice.delete' => 'Hapus / batalkan invoice',
+            'invoice.reopen' => 'Buka kembali invoice yang dibatalkan',
             'invoice.send' => 'Kirim invoice ke pelanggan',
             'payment.view' => 'Lihat pembayaran',
             'payment.create' => 'Catat pembayaran',
+            'payment.bulk' => 'Pembayaran massal & impor berkas',
+            'payment.receipt' => 'Terbitkan & kirim kuitansi',
+            // Dipisah dari payment.bulk: menarik kembali pembayaran yang
+            // kuitansinya sudah dipegang pelanggan bukan koreksi biasa.
+            'payment.force_revert' => 'Batalkan batch yang kuitansinya sudah terkirim',
             'payment.delete' => 'Hapus pembayaran',
         ],
         'Master Data' => [
@@ -49,6 +55,7 @@ class RolePermissionSeeder extends Seeder
         'Report' => [
             'report.view' => 'Lihat report',
             'report.export' => 'Export report Excel/PDF',
+            'reading.purge' => 'Hapus data mentah lama di luar jadwal otomatis',
         ],
         'Sistem' => [
             'setting.manage' => 'Kelola setting aplikasi',
@@ -79,7 +86,7 @@ class RolePermissionSeeder extends Seeder
             'permissions' => [
                 'monitoring.view',
                 'invoice.view', 'invoice.generate', 'invoice.update', 'invoice.send',
-                'payment.view', 'payment.create',
+                'payment.view', 'payment.create', 'payment.bulk', 'payment.receipt',
                 'customer.view', 'customer.create', 'customer.update',
                 'meter.view',
                 'tariff.view',

@@ -33,9 +33,37 @@
     .grand td { padding-top: 10px; font-size: 14px; font-weight: bold; color: #0f172a; }
     .note { margin-top: 26px; padding: 10px 12px; background: #f8fafc; font-size: 10px; color: #475569; }
     .foot { margin-top: 30px; font-size: 9px; color: #94a3b8; text-align: center; }
+    /* Blok penuh, bukan watermark diagonal: DomPDF tidak menangani rotate
+       dan position:fixed dengan andal, dan pita yang gagal dirender justru
+       membuat dokumen batal terlihat sah. */
+    .void { border: 2px solid #b91c1c; background: #fee2e2; color: #b91c1c;
+            padding: 12px 14px; margin-bottom: 16px; }
+    .void-title { font-size: 16px; font-weight: bold; letter-spacing: 3px; }
+    .void-detail { font-size: 10px; margin-top: 5px; line-height: 1.6; }
+    .paid-stamp { border: 2px solid; padding: 9px 12px; margin-top: 16px; }
+    .paid-stamp.is-lunas { border-color: #15803d; background: #dcfce7; color: #15803d; }
+    .paid-stamp.is-partial { border-color: #b45309; background: #fef3c7; color: #b45309; }
+    .paid-stamp-title { font-size: 15px; font-weight: bold; letter-spacing: 3px; }
+    .paid-stamp-sub { font-size: 10px; margin-top: 3px; }
   </style>
 </head>
 <body>
+
+  @if ($invoice->isCancelled())
+    <div class="void">
+      <div class="void-title">INVOICE DIBATALKAN</div>
+      <div class="void-detail">
+        Dokumen ini sudah dibatalkan dan <strong>tidak berlaku sebagai tagihan</strong>.
+        Mohon abaikan dan jangan lakukan pembayaran atas invoice ini.
+        @if ($invoice->cancelled_at)
+          <br>Dibatalkan pada {{ $invoice->cancelled_at->translatedFormat('d F Y, H:i') }} WIB.
+        @endif
+        @if ($invoice->cancel_reason)
+          <br>Alasan: {{ $invoice->cancel_reason }}
+        @endif
+      </div>
+    </div>
+  @endif
 
   <table class="head">
     <tr>
@@ -116,7 +144,61 @@
       <td>TOTAL TAGIHAN</td>
       <td class="v" style="font-size:14px">{{ rupiah($invoice->total_amount) }}</td>
     </tr>
+    @if ((float) $invoice->paid_amount > 0)
+      <tr>
+        <td>Sudah dibayar</td>
+        <td class="v" style="color:#15803d">− {{ rupiah($invoice->paid_amount) }}</td>
+      </tr>
+      <tr>
+        <td><strong>Sisa tagihan</strong></td>
+        <td class="v">{{ rupiah($invoice->outstanding) }}</td>
+      </tr>
+    @endif
   </table>
+
+  {{-- Riwayat pembayaran & cap status.
+       Tanpa ini, pelanggan yang sudah bayar lalu mengunduh ulang invoicenya
+       tetap memegang dokumen yang terbaca seperti tagihan belum dibayar. --}}
+  @if (! $invoice->isCancelled() && $invoice->payments->isNotEmpty())
+    <div style="clear:both"></div>
+
+    <div class="paid-stamp {{ $invoice->outstanding <= 0.5 ? 'is-lunas' : 'is-partial' }}">
+      <div class="paid-stamp-title">
+        {{ $invoice->outstanding <= 0.5 ? 'LUNAS' : 'DIBAYAR SEBAGIAN' }}
+      </div>
+      <div class="paid-stamp-sub">
+        @if ($invoice->outstanding <= 0.5)
+          Seluruh tagihan telah kami terima
+          @if ($invoice->paid_at) pada {{ $invoice->paid_at->translatedFormat('d F Y') }} @endif.
+        @else
+          Sisa yang belum dibayar: <strong>{{ rupiah($invoice->outstanding) }}</strong>
+        @endif
+      </div>
+    </div>
+
+    <table class="lines" style="margin-top:14px">
+      <thead>
+        <tr>
+          <th>Riwayat Pembayaran</th>
+          <th>No Kuitansi</th>
+          <th>Metode</th>
+          <th>Jumlah</th>
+        </tr>
+      </thead>
+      <tbody>
+        @foreach ($invoice->payments->sortBy('payment_date') as $payment)
+          <tr>
+            <td>{{ $payment->payment_date->translatedFormat('d F Y') }}</td>
+            <td style="text-align:left;color:#64748b">{{ $payment->receipt_no ?? '—' }}</td>
+            <td style="text-align:left;color:#64748b">
+              {{ ['transfer' => 'Transfer', 'cash' => 'Tunai'][$payment->method] ?? 'Lainnya' }}
+            </td>
+            <td style="font-weight:bold">{{ rupiah($payment->amount, false) }}</td>
+          </tr>
+        @endforeach
+      </tbody>
+    </table>
+  @endif
 
   @if ($invoice->notes)
     <div class="note"><strong>Catatan:</strong> {{ $invoice->notes }}</div>

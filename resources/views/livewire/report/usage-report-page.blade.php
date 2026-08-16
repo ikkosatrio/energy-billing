@@ -46,7 +46,6 @@
                         <th class="num">WBP (kWh)</th>
                         <th class="num">Total kWh</th>
                         <th class="num">Beban Puncak</th>
-                        <th class="num">Hari Berdata</th>
                         <th class="num">Tagihan</th>
                     </tr>
                 </thead>
@@ -63,12 +62,11 @@
                             <td class="num">{{ kwh($row['wbp'], 1) }}</td>
                             <td class="num strong">{{ kwh($row['total_kwh'], 1) }}</td>
                             <td class="num">{{ $row['peak_kw'] !== null ? kwh($row['peak_kw'], 1).' kW' : '—' }}</td>
-                            <td class="num text-muted">{{ $row['days'] }}</td>
                             <td class="num strong">{{ rupiah($row['billed']) }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="table-empty">
+                            <td colspan="8" class="table-empty">
                                 Belum ada data agregat harian pada rentang ini.
                                 Data terisi setelah gateway mengirim pembacaan dan job agregasi berjalan.
                             </td>
@@ -82,7 +80,7 @@
                             <td class="num">{{ kwh($totals['lwbp'], 1) }}</td>
                             <td class="num">{{ kwh($totals['wbp'], 1) }}</td>
                             <td class="num">{{ kwh($totals['total_kwh'], 1) }}</td>
-                            <td colspan="2"></td>
+                            <td></td>
                             <td class="num">{{ rupiah($totals['billed']) }}</td>
                         </tr>
                     </tfoot>

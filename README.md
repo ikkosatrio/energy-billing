@@ -26,6 +26,70 @@ akhir periode lalu menerbitkan invoice otomatis.
 | Report              | Rekap pemakaian kWh, rekap tagihan & penerimaan, data meter mentah  |
 | Sistem              | Setting aplikasi, user, role & hak akses, log aktivitas             |
 
+## Kartu Real-time Monitoring
+
+Tiap power meter tampil sebagai satu kartu yang sengaja dibagi dua bagian,
+karena isinya bergerak dengan kecepatan yang sangat berbeda:
+
+| Bagian | Isi | Berubah |
+| ------ | --- | ------- |
+| **Sekarang** | Stand register LWBP & WBP (kWh), tegangan & arus tiap jalur | tiap gateway mengirim |
+| **Pemakaian** | kWh + rupiah hari ini, minggu berjalan, bulan berjalan | sekali sehari |
+| **Pemakaian harian** | Satu batang per tanggal sejak awal bulan, hari terboros disorot | sekali sehari |
+
+Definisi rentangnya:
+
+- **Hari ini** — sejak tengah malam, dihitung langsung dari `meter_readings`.
+  Agregat harian baru terisi setelah job agregasi berjalan, jadi memakainya
+  akan membuat angka hari ini tertinggal.
+- **Minggu berjalan** — Senin sampai hari ini. Bila minggunya dimulai di bulan
+  sebelumnya, sisa hari di bulan lalu tetap ikut dihitung.
+- **Bulan berjalan** — tanggal 1 sampai hari ini.
+- **Tertinggi** — hari dengan pemakaian kWh terbesar bulan ini, beserta
+  tanggalnya. Batangnya disorot di grafik dengan warna yang sama dengan titik
+  pada keterangan di bawahnya. Batang hari ini diarsir karena angkanya masih
+  akan bertambah sampai tengah malam.
+
+> **Rupiah di kartu ini adalah estimasi biaya energi saja** — `kWh LWBP × tarif
+> + kWh WBP × tarif`, memakai tarif yang berlaku hari ini. Biaya beban, biaya
+> admin, PPJ, dan PPN tidak ikut karena ketiganya berlaku per bulan; membaginya
+> ke angka "hari ini" hanya menghasilkan angka yang kelihatan pasti padahal
+> mengada-ada. **Nominal yang sah tetap datang dari invoice.**
+>
+> Golongan yang belum punya tarif berlaku menampilkan "tarif belum diatur",
+> bukan Rp 0 — kWh-nya tetap benar, hanya rupiahnya yang belum bisa dihitung.
+
+Hari-hari sebelum hari ini dibaca dari `meter_readings_daily`, bukan dari
+pembacaan mentah: memuat sebulan penuh data mentah untuk seluruh meter tiap
+kali polling akan menghabiskan memori. Angka hari ini **menggantikan** baris
+agregat hari ini, tidak ditambahkan, supaya tidak terhitung dua kali.
+
+Perhitungannya ada di
+[UsageSummaryService](app/Services/Monitoring/UsageSummaryService.php) dan
+memakai [ConsumptionCalculator](app/Services/Monitoring/ConsumptionCalculator.php)
+yang sama dengan tagihan, sehingga meter yang di-reset tidak menghasilkan angka
+raksasa di kartu.
+
+### Jeda penyegaran
+
+Jedanya dipilih sendiri lewat deret tombol di kanan atas: **5s · 10s · 30s ·
+1m · 5m · 10m · Manual**. Default 30 detik, dan pilihannya disimpan di sesi
+sehingga bertahan saat pindah halaman lalu kembali. **Manual** mematikan
+polling sepenuhnya; tombol segarkan di sebelahnya tetap tersedia pada jeda apa
+pun.
+
+Setiap penyegaran memuat ulang pembacaan mentah hari ini untuk seluruh meter
+aktif. Pada jeda 5 detik itu berarti 12× lebih banyak query per menit
+dibanding 1 menit — aman untuk puluhan meter, tapi bila jumlah meternya sudah
+ratusan, pilih jeda yang lebih panjang atau pindahkan sumber angka hari ini ke
+agregat harian.
+
+### Filter jenis sambungan
+
+**Real-time Monitoring** dan **Master Data → Power Meter Device** punya filter
+1 phase / 3 phase. Di halaman monitoring, tiap pilihan menampilkan jumlah
+perangkatnya sehingga terlihat ada berapa sebelum filternya dipilih.
+
 ## Aturan bisnis utama
 
 - **1 pelanggan = 1 gudang = 1 power meter.**
@@ -61,8 +125,47 @@ Diterapkan di enam tempat: invoice, agregat harian, chart per jam, kWh hari ini
 di monitoring, ringkasan data mentah, dan seluruh rekap yang membaca agregat
 harian. Dikunci oleh `tests/Feature/MeterResetTest.php`.
 
+### Titik awal periode
+
+Stand awal diambil dari pembacaan **terakhir sebelum periode**, yaitu stand
+akhir periode sebelumnya — sama seperti tagihan listrik pada umumnya. Agregat
+harian juga memakai pembacaan terakhir sebelum hari itu sebagai titik awal.
+
+Tanpa ini, pemakaian di setiap pergantian hari tidak masuk ke hari mana pun:
+hilang satu interval per hari, dan Rekap Pemakaian membaca lebih rendah
+daripada yang ditagihkan invoice (pada interval 30 menit selisihnya ~2% sebulan).
+
+Dengan aturan yang sama di kedua tempat, **jumlah agregat harian sepanjang
+periode sama persis dengan angka pada invoice** — diuji pada interval 1, 5, dan
+30 menit.
+
+Pelanggan baru yang belum punya pembacaan sebelumnya memakai pembacaan pertama
+di dalam periode sebagai titik awal.
+
+### Cara reset dideteksi
+
 Jalur normal tetap memakai selisih stand yang murah; penjumlahan selisih hanya
-ditempuh ketika reset terdeteksi.
+ditempuh ketika reset terdeteksi. Tiga pemicunya:
+
+1. Stand terakhir lebih kecil dari stand pertama
+2. `SUM(reset_count)` pada agregat harian periode itu lebih dari nol
+3. Periode itu belum punya agregat harian sama sekali
+
+Poin 2 yang menutup lubang paling berbahaya. Membandingkan stand pertama dengan
+stand terakhir saja **tidak cukup**: meter yang di-reset berkali-kali bisa
+berakhir di angka lebih tinggi daripada awalnya. Contoh nyata — 100 siklus
+naik-lalu-reset yang berhenti di stand 20, dari stand awal 0. Pemeriksaan
+akhir-vs-awal membacanya sebagai normal dan menagih **20 kWh dari 5.020 kWh**
+yang sebenarnya terpakai, tanpa peringatan apa pun.
+
+Agregat harian menutupnya karena `reset_count`-nya dihitung dengan menelusuri
+seluruh pembacaan hari itu — reset di tengah periode tetap tertangkap. Query-nya
+murah: satu baris per hari, bukan per pembacaan. Dikunci
+`test_reset_berulang_yang_berakhir_di_stand_lebih_tinggi`.
+
+Poin 3 memastikan periode tanpa agregat harian tidak pernah ditagih dari selisih
+stand yang belum terverifikasi — **jadi scheduler `readings:aggregate` wajib
+berjalan.**
 
 ### Reset vs rollover
 
@@ -138,10 +241,23 @@ npm run tw:watch
 menu Sistem → Dokumentasi API. Halaman ini berada di balik login aplikasi.
 
 ```
-POST /api/v1/readings   Kirim pembacaan
+POST /api/v1/readings   Kirim pembacaan (dicatat sebagai riwayat)
+POST /api/v1/status     Kirim kondisi terakhir perangkat (ditimpa, tanpa riwayat)
 GET  /api/v1/meters     Daftar meter beserta ID-nya
 GET  /api/v1/ping       Cek token & interval push
 ```
+
+Dua endpoint kirim itu berbeda tujuan dan **tidak saling menggantikan**:
+
+| | `/readings` | `/status` |
+|---|---|---|
+| Disimpan sebagai | baris baru di `meter_readings` | satu baris per meter, ditimpa terus |
+| Riwayat | ya — dasar seluruh tagihan | tidak ada |
+| Dipakai untuk | invoice, laporan, grafik | melihat kondisi terkini perangkat |
+| Frekuensi wajar | sesuai interval push | sesering apa pun |
+
+Keduanya menyegarkan `last_seen_at`, jadi gateway yang hanya mengirim status
+tetap terbaca *online* di halaman monitoring.
 
 ### Identifikasi meter
 
@@ -203,6 +319,65 @@ baris dan seluruhnya milik satu meter:
 `stand_lwbp` dan `stand_wbp` adalah **angka kumulatif meter**, bukan pemakaian.
 Pengiriman ulang untuk timestamp yang sama diabaikan, tidak menimpa dan tidak
 menggandakan.
+
+### Kondisi perangkat — `POST /api/v1/status`
+
+Informasi yang hanya perlu diketahui keadaan terakhirnya: kekuatan sinyal WiFi,
+alamat IP, MAC address, dan versi firmware. Tidak ada riwayat yang ditulis, jadi
+gateway boleh mengirimnya sesering mungkin tanpa membebani tabel pembacaan.
+
+```json
+{
+  "meter_id": 1,
+  "signal_dbm": -62,
+  "ip_address": "192.168.10.21",
+  "mac_address": "A4:CF:12:9B:00:7E",
+  "firmware_version": "1.4.2",
+  "active_power_kw": 412.6,
+  "voltage_r": 229.6,
+  "current_r": 41.2,
+  "power_factor": 0.95,
+  "frequency": 50
+}
+```
+
+Semua field kecuali `meter_id` bersifat opsional, dan **field yang tidak dikirim
+dibiarkan apa adanya** — bukan dihapus. Gateway boleh mengirim status ringkas
+(mis. hanya `signal_dbm`) tanpa menghilangkan IP dan firmware yang sudah
+tercatat.
+
+`signal_dbm` diterima pada rentang −120 sampai 0. Nilainya ditampilkan sebagai
+batang sinyal:
+
+| dBm | Tampilan |
+|---|---|
+| ≥ −55 | 4 batang, kuat |
+| −56 … −67 | 3 batang, baik |
+| −68 … −75 | 2 batang, cukup |
+| −76 … −85 | 1 batang, lemah |
+| < −85 | 1 batang, sangat lemah |
+
+Hasilnya muncul read-only di form **Power Meter Device** (panel *Informasi
+Perangkat*, hanya saat mengubah data) dan sebagai kolom di **Monitoring →
+Status Perangkat**. Tidak ada input manual — satu-satunya sumbernya endpoint ini.
+
+Bila `stand_lwbp`/`stand_wbp` ikut dikirim, keduanya dikali rasio CT persis
+seperti pada `/readings`, supaya angkanya bisa dibandingkan langsung. Tetap saja
+angka ini **tidak dipakai menagih** — tagihan hanya membaca `meter_readings`.
+
+### Jenis sambungan (1 phase / 3 phase)
+
+Kolom `phase` pada power meter dipilih manual saat mendaftarkan perangkat,
+default **3 phase**. Pengaruhnya murni ke tampilan:
+
+- Meter 1 phase hanya menampilkan tegangan dan arus jalur **R**. Kolom S dan T
+  disembunyikan di kartu Real-time Monitoring, laporan data mentah, dan export
+  Excel-nya — karena jalur itu memang tidak ada, bukan karena datanya gagal
+  masuk.
+- Meter 3 phase menampilkan R, S, dan T.
+
+Perhitungan kWh sama sekali tidak melihat kolom ini: tagihan dihitung dari stand
+LWBP/WBP, bukan dari tegangan atau arus.
 
 ### Pilihan server di Swagger
 
@@ -288,7 +463,7 @@ Dua jenis masalah ditandai otomatis:
 
 | Tanda | Arti |
 | ----- | ---- |
-| **Stand mundur** | Stand kumulatif turun — meter di-reset atau berputar ke nol. Pemakaian pada rentang itu tidak terhitung |
+| **Stand mundur** | Stand kumulatif turun — meter di-reset atau berputar ke nol. Pemakaiannya tetap terhitung (lihat [Penanganan meter yang di-reset](#penanganan-meter-yang-di-reset)); tanda ini hanya mengabarkan kejadiannya |
 | **Jeda N mnt** | Selisih waktu melebihi 3× interval push (minimal 5 menit) — gateway sempat mati atau kehilangan jaringan |
 
 Ambangnya sengaja tidak seketat kelipatan interval saja: dengan push tiap 60
@@ -298,6 +473,9 @@ baris, dan tabel penuh sorotan merah justru menyembunyikan gangguan sungguhan.
 Kolom Δ LWBP / Δ WBP menunjukkan selisih terhadap baris sebelumnya. Baris
 pertama tiap halaman tetap dibandingkan dengan pembacaan sebelum halaman itu,
 sehingga masalah di batas halaman tidak terlewat.
+
+Kolom tegangan dan arus mengikuti jenis sambungan meter: 3 phase menampilkan
+R/S/T, 1 phase hanya R. Export Excel-nya memakai kolom yang sama persis.
 
 Export tersedia dalam Excel saja (maksimal 50.000 baris) — ribuan baris tidak
 terbaca di PDF. Penyaring "hanya baris bermasalah" bekerja per halaman; untuk

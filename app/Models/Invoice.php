@@ -17,6 +17,21 @@ class Invoice extends Model
 {
     use HasFactory;
 
+    /**
+     * Satu-satunya sumber label status — dipakai baik oleh komponen badge
+     * <x-invoice-status> di layar maupun export laporan (Excel/PDF tidak
+     * bisa memanggil komponen Blade), supaya labelnya tidak pernah bisa
+     * berbeda antara yang dilihat dan yang diunduh.
+     */
+    public const STATUS_LABELS = [
+        'draft' => 'Draft',
+        'issued' => 'Belum Bayar',
+        'partial' => 'Bayar Sebagian',
+        'paid' => 'Lunas',
+        'overdue' => 'Jatuh Tempo',
+        'cancelled' => 'Dibatalkan',
+    ];
+
     protected $fillable = [
         'invoice_no',
         'billing_period_id',
@@ -67,6 +82,7 @@ class Invoice extends Model
         'due_date' => 'date',
         'paid_at' => 'datetime',
         'sent_at' => 'datetime',
+        'cancelled_at' => 'datetime',
         'stand_lwbp_start' => 'decimal:2',
         'stand_lwbp_end' => 'decimal:2',
         'kwh_lwbp' => 'decimal:2',
@@ -120,6 +136,31 @@ class Invoice extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->status === 'cancelled';
+    }
+
+    /**
+     * Status yang masih boleh dibatalkan.
+     *
+     * `partial` dan `paid` sengaja tidak masuk: uangnya sudah diterima, dan
+     * membatalkan tagihan yang sudah dibayar akan membuat pembayaran itu
+     * menggantung tanpa tagihan induk. Koreksinya lewat refund atau nota
+     * kredit, bukan pembatalan. Pemeriksaan pembayaran tetap dilakukan
+     * terpisah karena `issued` pun bisa sudah punya pembayaran sebagian
+     * yang belum sempat mengubah status.
+     */
+    public function isCancellable(): bool
+    {
+        return in_array($this->status, ['draft', 'issued', 'overdue'], true);
     }
 
     public function getTotalKwhAttribute(): float

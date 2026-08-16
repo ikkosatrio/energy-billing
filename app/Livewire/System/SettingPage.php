@@ -52,13 +52,20 @@ class SettingPage extends Component
             'values.invoice_rounding_to' => ['required', 'integer', 'min:0'],
             'values.invoice_auto_issue' => ['boolean'],
             'values.invoice_auto_send' => ['boolean'],
+            'values.receipt_number_format' => ['required', 'string', 'max:100'],
+            'values.receipt_auto_send' => ['boolean'],
+            'values.receipt_auto_send_days' => ['required', 'integer', 'between:0,30'],
 
             'values.iot_push_interval_seconds' => ['required', 'integer', 'min:1'],
             'values.iot_offline_after_minutes' => ['required', 'integer', 'min:1'],
             'values.iot_retention_months' => ['required', 'integer', 'min:1'],
             // Boleh dikosongkan untuk mematikan autentikasi API; peringatannya
-            // ditampilkan di halaman Setting.
-            'values.api_token' => ['nullable', 'string', 'min:24', 'max:128'],
+            // ditampilkan di halaman Setting. Token bisa ditulis manual (tidak
+            // lagi hanya lewat generate), jadi spasi ditolak — perbandingannya
+            // di AuthenticateGateway persis karakter demi karakter, spasi yang
+            // tidak sengaja ikut ter-copy akan membuat gateway ditolak tanpa
+            // sebab yang jelas.
+            'values.api_token' => ['nullable', 'string', 'min:24', 'max:128', 'regex:/^\S+$/'],
 
             'logo' => ['nullable', 'image', 'max:2048'],
         ];
@@ -78,6 +85,8 @@ class SettingPage extends Component
             'values.ppj_percent' => 'PPJ',
             'values.ppn_percent' => 'PPN',
             'values.invoice_rounding_to' => 'pembulatan total',
+            'values.receipt_number_format' => 'format nomor kuitansi',
+            'values.receipt_auto_send_days' => 'jeda kirim kuitansi',
             'values.api_token' => 'API token',
         ];
     }
@@ -101,12 +110,20 @@ class SettingPage extends Component
         return [
             // 29–31 tidak ada di setiap bulan, jadi tanggal generate dibatasi.
             'values.billing_cut_off_day.between' => 'Tanggal generate harus antara 1 sampai 28.',
+            'values.api_token.regex' => 'API token tidak boleh mengandung spasi.',
         ];
     }
 
     public function save(SettingService $settings): void
     {
         $this->authorize('setting.manage');
+
+        // Ditulis manual, jadi rawan ikut ter-copy spasi di ujungnya —
+        // dibersihkan sebelum divalidasi supaya tidak lolos sebagai token
+        // yang terlihat benar tapi gagal cocok persis di AuthenticateGateway.
+        if (isset($this->values['api_token'])) {
+            $this->values['api_token'] = trim($this->values['api_token']);
+        }
 
         $this->validate();
 

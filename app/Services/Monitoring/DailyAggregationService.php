@@ -38,15 +38,40 @@ class DailyAggregationService
             return null;
         }
 
-        $first = $readings->first();
         $last = $readings->last();
         $peak = $readings->whereNotNull('active_power_kw')->sortByDesc('active_power_kw')->first();
 
+        /*
+         * Titik awal hari ini adalah pembacaan TERAKHIR SEBELUM hari ini,
+         * bukan pembacaan pertama hari ini.
+         *
+         * Tanpa itu, pemakaian antara pembacaan terakhir kemarin (mis. 23:30)
+         * dan pembacaan pertama hari ini (00:00) tidak masuk ke hari mana pun.
+         * Hilangnya satu interval setiap hari — pada interval 30 menit itu
+         * berarti 15 jam pemakaian per bulan, dan membuat Rekap Pemakaian
+         * membaca ~2% lebih rendah daripada yang ditagihkan invoice.
+         *
+         * Dengan pembacaan pembuka ini, jumlah agregat harian sepanjang periode
+         * sama persis dengan selisih stand yang dipakai invoice.
+         */
+        $opening = MeterReading::where('power_meter_id', $meter->id)
+            ->where('read_at', '<', $start->toDateTimeString())
+            ->orderByDesc('read_at')
+            ->first(['read_at', 'stand_lwbp', 'stand_wbp']);
+
+        // collect()->prepend() memutasi koleksi aslinya, sehingga reading_count
+        // ikut bertambah bila dipakai langsung. Koleksi baru dibuat terpisah.
+        $series = $opening ? collect([$opening])->concat($readings) : $readings;
+
         // Dihitung dari penjumlahan selisih antar pembacaan, bukan sekadar
-        // stand akhir dikurangi stand awal. Bedanya baru terasa saat meter
-        // di-reset di tengah hari: cara lama menghasilkan 0 dan menghapus
-        // seluruh pemakaian hari itu.
-        $usage = $this->consumption->fromReadings($readings, $meter->effective_stand_max);
+        // stand akhir dikurangi stand awal. Bedanya terasa saat meter di-reset
+        // di tengah hari: cara lama menghasilkan 0 dan menghapus seluruh
+        // pemakaian hari itu.
+        $usage = $this->consumption->fromReadings($series, $meter->effective_stand_max);
+
+        // Stand awal ikut memakai pembacaan pembuka, sehingga
+        // `stand_akhir - stand_awal` tetap konsisten dengan kolom kWh.
+        $first = $opening ?? $readings->first();
 
         return MeterReadingDaily::updateOrCreate(
             ['power_meter_id' => $meter->id, 'date' => $date->toDateString()],

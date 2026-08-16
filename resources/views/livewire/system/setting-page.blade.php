@@ -181,6 +181,50 @@
                             </div>
                         @endif
                     </div>
+
+                    {{-- ── Kuitansi ────────────────────────────────────── --}}
+                    <div style="margin-top:20px;padding-top:18px;border-top:1px solid var(--border-soft)">
+                        <div class="field-label" style="margin-bottom:10px">Kuitansi</div>
+
+                        <div class="field">
+                            <label class="field-label">Format Nomor Kuitansi</label>
+                            <input type="text" class="input mono @error('values.receipt_number_format') is-invalid @enderror"
+                                   wire:model="values.receipt_number_format">
+                            @error('values.receipt_number_format') <div class="field-error">{{ $message }}</div> @enderror
+                            <div class="card-sub">
+                                Penanda yang dikenali: <span class="mono">{YYYY} {YY} {MM} {SEQ}</span>.
+                                Nomor urut dihitung per bulan penerbitan.
+                            </div>
+                        </div>
+
+                        <label class="checkbox-row" style="margin-top:12px">
+                            <input type="checkbox" wire:model.live="values.receipt_auto_send">
+                            <span>Kirim kuitansi otomatis ke pelanggan</span>
+                        </label>
+                        <div class="card-sub" style="margin-left:23px">
+                            Tanpa ini, kuitansi hanya terkirim bila operator menekan tombol Kirim
+                            di halaman Pembayaran.
+                        </div>
+
+                        @if ($values['receipt_auto_send'] ?? false)
+                            <div class="field" style="margin-top:12px;max-width:260px">
+                                <label class="field-label">Kirim Setelah (hari)</label>
+                                <input type="number" min="0" max="30"
+                                       class="input mono @error('values.receipt_auto_send_days') is-invalid @enderror"
+                                       wire:model="values.receipt_auto_send_days">
+                                @error('values.receipt_auto_send_days') <div class="field-error">{{ $message }}</div> @enderror
+                            </div>
+
+                            <div class="alert alert-info" style="margin-top:12px">
+                                Kuitansi dikirim <strong>{{ (int) ($values['receipt_auto_send_days'] ?? 3) }} hari</strong>
+                                setelah pembayaran dicatat, bukan seketika. Jeda ini memberi waktu menarik
+                                pembayaran yang ternyata salah input — begitu kuitansi terkirim, dokumennya
+                                sudah di tangan pelanggan dan batch-nya tidak bisa dibatalkan tanpa izin khusus.
+                                Isi <span class="mono">0</span> untuk mengirim di hari yang sama.
+                                Pengiriman lewat antrean, jadi butuh container <span class="mono">queue</span> berjalan.
+                            </div>
+                        @endif
+                    </div>
                 </div>
 
                 {{-- ── IoT ─────────────────────────────────────────────── --}}
@@ -189,22 +233,40 @@
 
                     <div class="field">
                         <label class="field-label">API Token Gateway</label>
-                        <input type="text" readonly
-                               class="input mono @error('values.api_token') is-invalid @enderror"
-                               style="background:var(--bg-subtle)"
-                               wire:model="values.api_token"
-                               onclick="this.select()">
+                        <div class="input-row">
+                            <input type="text" id="api-token-input"
+                                   class="input mono @error('values.api_token') is-invalid @enderror"
+                                   wire:model="values.api_token"
+                                   autocomplete="off" spellcheck="false">
+                            <button type="button" class="btn-icon" title="Salin token" aria-label="Salin token"
+                                    onclick="
+                                        var el = document.getElementById('api-token-input');
+                                        if (!el.value) return;
+                                        navigator.clipboard.writeText(el.value).then(function () {
+                                            window.Toast && Toast.success('Token disalin ke clipboard.');
+                                        }, function () {
+                                            window.Toast && Toast.error('Gagal menyalin — pilih teksnya lalu salin manual (Ctrl/Cmd+C).');
+                                        });
+                                    ">
+                                <i data-lucide="copy" style="width:15px;height:15px"></i>
+                            </button>
+                        </div>
                         @error('values.api_token') <div class="field-error">{{ $message }}</div> @enderror
                         <div class="card-sub">
                             Dipakai seluruh gateway lewat header <span class="mono">X-Api-Token</span>.
-                            Klik untuk menyalin. Token ini tetap terlihat kapan saja — tidak disembunyikan
-                            setelah dibuat.
+                            Bisa digenerate otomatis atau ditulis sendiri — token tetap terlihat kapan saja,
+                            tidak disembunyikan setelah dibuat.
                         </div>
 
                         @can('setting.manage')
                             <button type="button" class="btn btn-outline btn-sm" style="margin-top:10px"
-                                    wire:click="regenerateToken"
-                                    wire:confirm="Buat token baru? Seluruh gateway harus dikonfigurasi ulang atau kirimannya akan ditolak.">
+                                    x-on:click="ConfirmDialog.show({
+                                            title: 'Buat token baru?',
+                                            text: 'Seluruh gateway harus dikonfigurasi ulang, atau kirimannya akan ditolak.',
+                                            danger: true,
+                                            confirmText: 'Ya, Buat Token Baru',
+                                            onConfirm: () => $wire.regenerateToken(),
+                                        })">
                                 <i data-lucide="key-round" style="width:14px;height:14px"></i>
                                 Generate Token Baru
                             </button>
@@ -245,12 +307,12 @@
                         </div>
                     </div>
 
-                    <div class="alert alert-info" style="margin-top:14px">
+                    {{-- <div class="alert alert-info" style="margin-top:14px">
                         Gateway mengirim data ke <span class="mono">{{ $ingestUrl }}</span>
                         dengan <span class="mono">meter_id</span> pada payload — ID-nya terlihat di
                         halaman Power Meter Device.
                         <a href="{{ $docsUrl }}" target="_blank">Buka dokumentasi API →</a>
-                    </div>
+                    </div> --}}
                 </div>
             </div>
         </div>

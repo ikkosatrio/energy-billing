@@ -11,6 +11,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Pembacaan mentah dari gateway. `stand_lwbp` / `stand_wbp` adalah angka
  * kumulatif meter, bukan pemakaian — pemakaian selalu berupa selisih dua
  * pembacaan.
+ *
+ * Keduanya register yang independen (akumulator tarif berbeda), jadi
+ * sengaja tidak ada accessor total_stand — menjumlahkan LWBP+WBP jadi satu
+ * "stand total" tidak berarti apa-apa secara fisik.
  */
 class MeterReading extends Model
 {
@@ -56,11 +60,6 @@ class MeterReading extends Model
     public function powerMeter(): BelongsTo
     {
         return $this->belongsTo(PowerMeter::class);
-    }
-
-    public function getTotalStandAttribute(): float
-    {
-        return (float) $this->stand_lwbp + (float) $this->stand_wbp;
     }
 
     public function scopeBetween(Builder $query, string $from, string $to): Builder

@@ -104,13 +104,18 @@
                             <td class="text-right nowrap">
                                 @can('invoice.generate')
                                     @if ($period->status === 'closed')
-                                        <span class="link-action muted"
-                                              wire:click="reopen({{ $period->id }})"
-                                              wire:confirm="Buka kembali periode {{ $period->code }}?">Buka Kembali</span>
+                                        <span class="link-action muted" x-on:click="ConfirmDialog.show({
+                                                title: 'Buka kembali periode ' + @js($period->code) + '?',
+                                                confirmText: 'Ya, Buka Kembali',
+                                                onConfirm: () => $wire.reopen({{ $period->id }}),
+                                            })">Buka Kembali</span>
                                     @elseif ($period->invoices_count > 0)
-                                        <span class="link-action"
-                                              wire:click="close({{ $period->id }})"
-                                              wire:confirm="Tutup periode {{ $period->code }}? Invoice di dalamnya tidak bisa digenerate ulang.">Tutup Periode</span>
+                                        <span class="link-action" x-on:click="ConfirmDialog.show({
+                                                title: 'Tutup periode ' + @js($period->code) + '?',
+                                                text: 'Invoice di dalamnya tidak bisa digenerate ulang.',
+                                                confirmText: 'Ya, Tutup',
+                                                onConfirm: () => $wire.close({{ $period->id }}),
+                                            })">Tutup Periode</span>
                                     @endif
                                 @endcan
                             </td>

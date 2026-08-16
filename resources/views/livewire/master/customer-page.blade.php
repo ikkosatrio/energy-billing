@@ -74,9 +74,12 @@
                                     <span class="link-action" wire:click="edit({{ $customer->id }})" style="margin-right:12px">Ubah</span>
                                 @endcan
                                 @can('customer.delete')
-                                    <span class="link-action danger"
-                                          wire:click="delete({{ $customer->id }})"
-                                          wire:confirm="Hapus pelanggan {{ $customer->name }}?">Hapus</span>
+                                    <span class="link-action danger" x-on:click="ConfirmDialog.show({
+                                            title: 'Hapus pelanggan ' + @js($customer->name) + '?',
+                                            danger: true,
+                                            confirmText: 'Ya, Hapus',
+                                            onConfirm: () => $wire.delete({{ $customer->id }}),
+                                        })">Hapus</span>
                                 @endcan
                             </td>
                         </tr>

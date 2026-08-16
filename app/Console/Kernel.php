@@ -28,6 +28,10 @@ class Kernel extends ConsoleKernel
         // Menandai invoice yang lewat jatuh tempo.
         $schedule->command('invoices:mark-overdue')->dailyAt('01:00');
 
+        // Kuitansi dikirim setelah masa tunggu, memberi jeda untuk menarik
+        // pembayaran yang ternyata salah input sebelum dokumennya beredar.
+        $schedule->command('receipts:send-due')->dailyAt('07:00')->withoutOverlapping();
+
         // Membuang pembacaan mentah yang sudah lewat masa retensi. Agregat
         // harian tetap disimpan, jadi riwayat jangka panjang tidak hilang.
         $schedule->command('readings:prune')->weeklyOn(0, '02:00');

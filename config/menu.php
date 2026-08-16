@@ -142,6 +142,12 @@ return [
                 'permits' => ['report.view'],
             ],
             [
+                'title' => 'Laporan Pembayaran',
+                'route' => 'report.payments',
+                'icon' => 'receipt-text',
+                'permits' => ['report.view'],
+            ],
+            [
                 'title' => 'Data Meter Mentah',
                 'route' => 'report.readings',
                 'icon' => 'list',
@@ -181,15 +187,15 @@ return [
                 'icon' => 'history',
                 'permits' => ['activity_log.view'],
             ],
-            [
-                'title' => 'Dokumentasi API',
-                'route' => 'l5-swagger.default.api',
-                'icon' => 'book-open',
-                'permits' => [],
-                // Swagger UI adalah halaman terpisah, bukan bagian layout
-                // aplikasi — dibuka di tab baru.
-                'external' => true,
-            ],
+            // [
+            //     'title' => 'Dokumentasi API',
+            //     'route' => 'l5-swagger.default.api',
+            //     'icon' => 'book-open',
+            //     'permits' => [],
+            //     // Swagger UI adalah halaman terpisah, bukan bagian layout
+            //     // aplikasi — dibuka di tab baru.
+            //     'external' => true,
+            // ],
         ],
     ],
 

@@ -55,9 +55,12 @@
                                     @endcan
                                     @can('user.delete')
                                         @if ($user->id !== auth()->id())
-                                            <span class="link-action danger"
-                                                  wire:click="delete({{ $user->id }})"
-                                                  wire:confirm="Hapus user {{ $user->username }}?">Hapus</span>
+                                            <span class="link-action danger" x-on:click="ConfirmDialog.show({
+                                                    title: 'Hapus user ' + @js($user->username) + '?',
+                                                    danger: true,
+                                                    confirmText: 'Ya, Hapus',
+                                                    onConfirm: () => $wire.delete({{ $user->id }}),
+                                                })">Hapus</span>
                                         @endif
                                     @endcan
                                 </td>

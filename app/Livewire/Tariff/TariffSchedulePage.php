@@ -27,6 +27,9 @@ class TariffSchedulePage extends Component
     /** @var array<int, string> */
     public array $issues = [];
 
+    /** Modal "Duplikat dari meter lain". */
+    public bool $showCopy = false;
+
     public function mount(): void
     {
         $this->meterId = PowerMeter::orderBy('name')->value('id');
@@ -75,6 +78,82 @@ class TariffSchedulePage extends Component
     {
         unset($this->periods[$index]);
         $this->periods = array_values($this->periods);
+    }
+
+    /**
+     * Menyalin jadwal meter lain ke form yang sedang dibuka.
+     *
+     * Hasilnya sengaja BELUM disimpan: pengguna masih bisa memeriksa pita 24
+     * jam dan mengubah jamnya dulu. Menyalin langsung ke database akan
+     * menimpa jadwal yang ada tanpa sempat dilihat.
+     */
+    public function copyFrom(int $sourceMeterId): void
+    {
+        $this->authorize('tariff.update');
+
+        if (!$this->meterId || $sourceMeterId === $this->meterId) {
+            return;
+        }
+
+        $source = MeterTariffSchedule::where('power_meter_id', $sourceMeterId)
+            ->orderBy('sequence')
+            ->get(['start_time', 'tariff_type']);
+
+        if ($source->isEmpty()) {
+            $this->dispatch('toast', type: 'error', message: 'Meter itu belum punya jadwal tersimpan.');
+
+            return;
+        }
+
+        $this->periods = $source->map(fn ($row) => [
+            'start_time' => substr($row->start_time, 0, 5),
+            'tariff_type' => $row->tariff_type,
+        ])->all();
+
+        $this->issues = [];
+        $this->showCopy = false;
+
+        $name = PowerMeter::where('id', $sourceMeterId)->value('code');
+        $this->dispatch('toast', type: 'success', message: "Jadwal {$name} disalin. Periksa dulu, lalu klik Simpan Jadwal.");
+    }
+
+    /**
+     * Meter lain yang sudah punya jadwal tersimpan, beserta ringkasannya.
+     *
+     * Yang belum punya jadwal tidak ditawarkan — menyalin dari meter kosong
+     * tidak menghasilkan apa-apa selain kebingungan.
+     *
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function copySources()
+    {
+        if (!$this->meterId) {
+            return collect();
+        }
+
+        $schedules = MeterTariffSchedule::where('power_meter_id', '!=', $this->meterId)
+            ->orderBy('sequence')
+            ->get(['power_meter_id', 'start_time', 'tariff_type'])
+            ->groupBy('power_meter_id');
+
+        if ($schedules->isEmpty()) {
+            return collect();
+        }
+
+        return PowerMeter::whereIn('id', $schedules->keys())
+            ->with('customer:id,power_meter_id,name')
+            ->orderBy('name')
+            ->get(['id', 'code', 'name'])
+            ->map(fn (PowerMeter $meter) => [
+                'id' => $meter->id,
+                'code' => $meter->code,
+                'name' => $meter->name,
+                'customer' => $meter->customer?->name,
+                'periods' => $schedules[$meter->id]->map(fn ($row) => [
+                    'start_time' => substr($row->start_time, 0, 5),
+                    'tariff_type' => $row->tariff_type,
+                ])->all(),
+            ]);
     }
 
     public function save(ScheduleValidator $validator): void
@@ -140,6 +219,9 @@ class TariffSchedulePage extends Component
             'rows' => $rows,
             'totals' => $totals,
             'isValid' => $valid,
+            // Hanya disusun saat modalnya dibuka — daftar ini menarik seluruh
+            // jadwal meter lain, dan halaman ini re-render tiap ketikan jam.
+            'copySources' => $this->showCopy ? $this->copySources() : collect(),
         ]);
     }
 }

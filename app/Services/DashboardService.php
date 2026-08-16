@@ -93,25 +93,4 @@ class DashboardService
             'overdue_count' => $invoices->where('status', 'overdue')->count(),
         ];
     }
-
-    /**
-     * Meter beserta pelanggan dan daya sesaat terakhirnya, untuk panel
-     * "Status Meter" di dashboard.
-     */
-    public function meterList(int $limit = 6)
-    {
-        return PowerMeter::with(['customer:id,power_meter_id,name', 'latestReading'])
-            ->where('status', '!=', 'inactive')
-            ->orderBy('name')
-            ->limit($limit)
-            ->get();
-    }
-
-    public function recentInvoices(int $limit = 5)
-    {
-        return Invoice::with('billingPeriod:id,code')
-            ->orderByDesc('created_at')
-            ->limit($limit)
-            ->get();
-    }
 }

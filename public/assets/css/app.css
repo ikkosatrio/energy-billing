@@ -489,6 +489,22 @@ a:hover { color: var(--primary-dark); }
 .stat-foot.up { color: var(--success); }
 .stat-foot.down { color: var(--danger); }
 
+.stat-split {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.stat-split-item { display: flex; align-items: center; gap: 6px; }
+.stat-split-item strong {
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
 /* ── Tables ───────────────────────────────────────────────────────────── */
 
 .table-wrap { overflow-x: auto; }
@@ -543,6 +559,71 @@ a:hover { color: var(--primary-dark); }
 .badge-wbp     { background: var(--wbp-bg);     color: var(--wbp-fg); }
 .badge-square  { border-radius: 6px; }
 
+/* ── Kekuatan sinyal perangkat ────────────────────────────────────────── */
+
+.signal { display: inline-flex; align-items: center; gap: 8px; }
+
+/* Batang disejajarkan ke dasar supaya tingginya yang bertambah terbaca
+   sebagai besaran, bukan sekadar hiasan. */
+.signal-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
+
+.signal-bar {
+  width: 3px;
+  border-radius: 1px;
+  background: var(--border);
+  transition: background .18s ease;
+}
+.signal-bar:nth-child(1) { height: 35%; }
+.signal-bar:nth-child(2) { height: 55%; }
+.signal-bar:nth-child(3) { height: 78%; }
+.signal-bar:nth-child(4) { height: 100%; }
+
+.signal-good .signal-bar.is-on { background: var(--success); }
+.signal-fair .signal-bar.is-on { background: var(--warning); }
+.signal-weak .signal-bar.is-on { background: var(--danger); }
+.signal-poor .signal-bar.is-on { background: var(--danger); }
+
+.signal-value { font-family: var(--font-mono); font-size: 12.5px; color: var(--text-body); }
+.signal-unit { color: var(--text-faint); font-size: 11px; }
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Panel informasi perangkat (hanya-baca, diisi gateway) ────────────── */
+
+.device-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  padding: 16px 18px;
+}
+.device-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 14px;
+}
+.device-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
+.device-item-label { font-size: 11px; color: var(--text-faint); margin-bottom: 3px; }
+.device-item-value { font-family: var(--font-mono); font-size: 13px; color: var(--text); }
+.device-item-value.empty { color: var(--text-faint); font-family: var(--font-sans); }
+
+@media (max-width: 900px) {
+  .device-grid { grid-template-columns: 1fr; }
+}
+
 /* ── Charts (bar sederhana berbasis CSS) ──────────────────────────────── */
 
 .chart-legend { display: flex; gap: 14px; font-size: 12px; color: var(--text-muted); }
@@ -550,6 +631,16 @@ a:hover { color: var(--primary-dark); }
 .legend-swatch { width: 10px; height: 10px; border-radius: 3px; }
 .legend-swatch.lwbp { background: var(--lwbp); }
 .legend-swatch.wbp { background: var(--wbp); }
+
+.stand-split { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.stand-split-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+.stand-split-item .legend-swatch { flex: 0 0 auto; }
 
 .bar-chart { display: flex; align-items: flex-end; gap: 5px; height: 190px; }
 .bar-col {
@@ -573,12 +664,47 @@ a:hover { color: var(--primary-dark); }
 .bar.lwbp { background: var(--lwbp); }
 .bar.wbp { background: var(--wbp); }
 .bar.primary { background: linear-gradient(180deg, #3b82f6, #2563eb); }
-.bar-label { font-size: 9px; color: var(--text-faint); font-family: var(--font-mono); }
+.bar-label { font-size: 9px; color: var(--text-faint); font-family: var(--font-mono); flex-shrink: 0; }
 
-/* Batang bertumpuk WBP di atas LWBP */
-.bar-stack { display: flex; flex-direction: column; justify-content: flex-end; height: 100%; width: 100%; }
-.bar-stack .bar { border-radius: 0; }
-.bar-stack .bar:first-child { border-radius: 4px 4px 0 0; }
+/* Batang bertumpuk WBP di atas LWBP.
+   flex: 1 1 0 (bukan height: 100%) supaya area batang mengisi sisa ruang
+   kolom SETELAH bar-label — kalau dipaksa 100% + label, total tinggi
+   melebihi tinggi kolom dan browser overflow, yang membuat justify-content:
+   flex-end diam-diam jatuh ke rata atas alih-alih rata bawah.
+
+   padding-top menyediakan ruang untuk .bar-value. Karena box-sizing border-box,
+   tinggi batang (yang berbasis persen) ikut menyusut sebesar padding itu,
+   sehingga batang tertinggi pun tidak pernah menabrak labelnya sendiri. */
+.bar-stack {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  padding-top: 15px;
+}
+/* Tanpa ini batang ikut mengecil untuk memberi tempat pada label, dan tinggi
+   batang tidak lagi sebanding dengan angkanya. */
+.bar-stack .bar { border-radius: 0; flex-shrink: 0; }
+.bar-stack .bar:first-child,
+.bar-stack .bar-value + .bar { border-radius: 4px 4px 0 0; }
+
+/* Nilai di atas batang — terbaca tanpa perlu hover. Angka persisnya tetap
+   ada di tooltip, jadi label boleh diringkas (lihat helper kwh_short). */
+.bar-value {
+  flex-shrink: 0;
+  margin-bottom: 3px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -.02em;
+  color: var(--text-muted);
+  text-align: center;
+  white-space: nowrap;
+}
+.bar-col:hover .bar-value { color: var(--text); }
 
 /* Pita 24 jam pada halaman jadwal WBP/LWBP */
 .ribbon {
@@ -608,17 +734,367 @@ a:hover { color: var(--primary-dark); }
   font-family: var(--font-mono);
 }
 
-/* ── Metric tiles (kartu real-time meter) ─────────────────────────────── */
+/* ── Kartu meter (Real-time Monitoring) ───────────────────────────────────
+   Kartunya dibagi dua register waktu yang sengaja dipisah garis: bagian
+   "Sekarang" berubah tiap gateway mengirim, bagian pemakaian berubah sekali
+   sehari. Label sectionnya bukan hiasan — itu yang memberi tahu pembaca angka
+   mana yang bergerak dan mana yang tidak. */
 
-.metric-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.metric {
+.meter-grid {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 18px;
+  /* Kartunya padat informasi; di bawah 340px angkanya mulai berdesakan, jadi
+     jumlah kolom dibiarkan menyesuaikan sendiri. */
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+}
+@media (max-width: 720px) {
+  .meter-grid { grid-template-columns: 1fr; }
+}
+
+.meter-card { display: flex; flex-direction: column; }
+
+.meter-section { padding-top: 14px; margin-top: 14px; border-top: 1px solid var(--border-soft); }
+
+.meter-section-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 12px;
+}
+.meter-section-note { font-weight: 500; letter-spacing: 0; text-transform: none; font-size: 11px; }
+
+.micro-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* Stand register saat ini — apa yang selisihnya jadi dasar tagihan. Dua
+   kolom sejajar, bukan satu angka besar dengan pendamping kecil: LWBP dan
+   WBP sama pentingnya, tidak ada yang jadi headline atas yang lain. */
+.stand-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+.stand-cell { min-width: 0; }
+.stand-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+/* Stand meter yang sudah berjalan lama gampang tembus jutaan kWh — unit
+   diletakkan di baris sendiri di bawah, bukan menempel di sebelah angka,
+   supaya lebar sel sepenuhnya untuk digitnya sendiri. */
+.stand-value {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stand-unit { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); margin-top: 1px; }
+
+/* Tabel jalur R/S/T. Barisnya bertambah mengikuti jenis sambungan — 1 phase
+   hanya menampilkan R. */
+.phase-table { margin-top: 12px; border-top: 1px solid var(--border-soft); }
+
+.phase-row {
+  display: grid;
+  grid-template-columns: 44px 1fr 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.phase-row:last-child { border-bottom: 0; }
+
+.phase-head {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding-bottom: 6px;
+}
+
+.phase-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* Tiga rentang waktu ditumpuk, bukan dijajar: pemakaian sebulan bisa mencapai
+   ratusan ribu kWh dan rupiahnya sembilan digit — dijajar bertiga, angkanya
+   pasti terpotong. Ditumpuk, digitnya justru rata kanan satu sama lain
+   sehingga besarannya langsung terbandingkan. */
+.usage-list {
   background: var(--bg-subtle);
   border-radius: var(--radius-sm);
-  padding: 12px;
+  padding: 4px 12px;
 }
-.metric-label { font-size: 10px; font-weight: 700; color: var(--text-faint); letter-spacing: .06em; }
-.metric-value { font-size: 20px; font-weight: 800; font-family: var(--font-mono); }
-.metric-value small { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+
+.usage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border-muted);
+}
+.usage-row:last-child { border-bottom: 0; }
+
+.usage-span { min-width: 0; }
+.usage-figures { text-align: right; flex: none; }
+
+.usage-kwh {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  white-space: nowrap;
+}
+.usage-unit { font-size: 10px; font-weight: 600; color: var(--text-muted); margin-left: 4px; }
+
+/* Rupiah tidak dibuat lebih besar supaya tidak bersaing dengan daya aktif —
+   warnanya yang membuatnya langsung ketemu saat dicari. */
+.usage-rp {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary-dark);
+  margin-top: 2px;
+  white-space: nowrap;
+}
+.usage-note { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+
+/* Satu batang per tanggal sejak awal bulan. Hari tanpa data tetap dapat
+   batang tipis — celahnya sendiri adalah informasi. */
+.day-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 52px;
+  padding-bottom: 1px;
+  border-bottom: 1px solid var(--border);
+}
+
+.day-bar-slot { flex: 1 1 0; min-width: 0; height: 100%; display: flex; align-items: flex-end; }
+
+.day-bar {
+  width: 100%;
+  border-radius: 2px 2px 0 0;
+  background: #c9d8ec;
+  transition: background .15s ease;
+}
+.day-bar-slot:hover .day-bar { background: var(--primary-dark); }
+
+/* Hari terboros — warnanya sama dengan titik pada baris keterangan di
+   bawahnya, jadi tidak perlu dijelaskan mana yang dimaksud. */
+.day-bar.is-peak { background: var(--primary); }
+/* Hari ini belum selesai, jadi ditandai beda: batangnya masih akan tumbuh. */
+.day-bar.is-today { background: repeating-linear-gradient(45deg, #a9c2e4 0 3px, #c9d8ec 3px 6px); }
+.day-bar.is-today.is-peak { background: repeating-linear-gradient(45deg, var(--primary) 0 3px, var(--primary-dark) 3px 6px); }
+
+.peak-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: 12px;
+}
+.peak-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--primary);
+  align-self: center;
+  flex: none;
+}
+.peak-label { font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+.peak-value { font-weight: 800; }
+.peak-date { color: var(--text-body); }
+.peak-rp { margin-left: auto; color: var(--primary-dark); font-weight: 700; }
+
+.chart-empty {
+  font-size: 12px;
+  color: var(--text-faint);
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  text-align: center;
+}
+
+.meter-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 12px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text-faint);
+}
+
+/* Keterangan di sebelah filter — teks, bukan kontrol, jadi tidak diberi
+   tinggi baris seperti field di kirinya. */
+.filter-note { font-size: 12px; color: var(--text-body); line-height: 1.5; padding-bottom: 11px; }
+
+/* Deret tombol pilihan tunggal. Dipakai untuk jeda penyegaran: labelnya
+   pendek-pendek dan sering diubah sambil mengawasi angka, jadi satu klik
+   langsung ke pilihan lebih tepat daripada dropdown yang harus dibuka dulu —
+   dan pilihan yang sedang aktif terbaca tanpa membuka apa pun. */
+.segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 38px;
+  padding: 3px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.segmented-option {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  border-radius: 7px;
+  padding: 0 9px;
+  height: 100%;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .15s ease, color .15s ease;
+}
+.segmented-option:hover:not(.is-on) { background: var(--bg-card); color: var(--text); }
+.segmented-option:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+.segmented-option.is-on {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Deret jeda dan tombol segarkan-sekarang dijaga tetap satu blok supaya
+   keduanya berpindah baris bersama saat layarnya menyempit. */
+.refresh-control { display: flex; align-items: center; gap: 8px; }
+
+/* Manual bukan salah satu jeda — garis ini yang memisahkannya dari deret. */
+.segmented-split { width: 1px; height: 18px; background: #d5dde9; margin: 0 4px; flex: none; }
+
+.btn-icon.is-busy i { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-icon.is-busy i { animation: none; }
+}
+
+/* ── Ringkasan perangkat di Dashboard (versi padat kartu Real-time) ───────
+   Kartu penuh di halaman Real-time menampilkan satu-dua meter tiap baris;
+   di sini tujuannya sebaliknya — memuat SEBANYAK mungkin meter sekaligus
+   supaya seluruh gudang terlihat dalam satu pandangan. Setiap baris tetap
+   membawa data yang sama (kW+PF, tegangan/arus tiap jalur, kWh hari ini &
+   bulan ini), hanya tipografinya diperkecil dan grafik hariannya dilepas —
+   itu detail analisis yang tempatnya di halaman Real-time, bukan di sini.
+
+   Garis kiri berwarna adalah isyarat utama: normal nyaris tak terlihat
+   (redup), sementara offline/maintenance/beban tinggi menyala merah/kuning
+   dan diurutkan ke atas — supaya perangkat yang perlu ditindaklanjuti
+   langsung kelihatan tanpa harus membaca satu-satu. */
+
+.device-grid-widget { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(252px, 1fr)); }
+@media (max-width: 640px) { .device-grid-widget { grid-template-columns: 1fr; } }
+
+.device-tile {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+.device-tile.is-danger { border-left-color: var(--danger); background: linear-gradient(90deg, var(--danger-bg) 0%, var(--bg-card) 14%); }
+.device-tile.is-warning { border-left-color: var(--warning); background: linear-gradient(90deg, var(--warning-bg) 0%, var(--bg-card) 14%); }
+
+.device-tile-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.device-tile-name { font-size: 12.5px; font-weight: 700; line-height: 1.3; }
+.device-tile-sub { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+
+.device-tile-power {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border-soft);
+}
+.device-tile-kw { font-family: var(--font-mono); font-size: 19px; font-weight: 800; letter-spacing: -.02em; }
+.device-tile-kw small { font-size: 10px; font-weight: 600; color: var(--text-muted); margin-left: 3px; }
+.device-tile-pf { font-family: var(--font-mono); font-size: 11px; color: var(--text-faint); }
+
+/* Satu baris tetap per jalur (bukan tabel dengan header) — headernya diulang
+   di puluhan kartu cuma menambah tinggi tanpa menambah informasi. */
+.device-tile-phases { margin-top: 6px; display: flex; flex-direction: column; gap: 2px; }
+.device-tile-phase-row {
+  display: grid;
+  grid-template-columns: 16px 1fr 1fr;
+  gap: 6px;
+  font-size: 10.5px;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+.device-tile-phase-row b { color: var(--primary-dark); font-weight: 700; }
+
+.device-tile-usage {
+  display: flex;
+  gap: 10px;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border-soft);
+}
+.device-tile-usage-item { flex: 1; min-width: 0; }
+.device-tile-usage-label { font-size: 9.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); }
+.device-tile-usage-kwh { font-family: var(--font-mono); font-size: 12.5px; font-weight: 700; margin-top: 1px; }
+.device-tile-usage-kwh small { font-size: 9px; font-weight: 600; color: var(--text-muted); }
+.device-tile-usage-rp { font-family: var(--font-mono); font-size: 10.5px; color: var(--primary-dark); font-weight: 600; }
+
+.device-tile-foot {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 10px;
+  color: var(--text-faint);
+  display: flex;
+  justify-content: space-between;
+}
+
+.device-widget-head { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+.device-widget-title { display: flex; align-items: center; gap: 8px; }
 
 /* Baris label/nilai untuk panel ringkasan & setting */
 .kv-row {
@@ -641,6 +1117,12 @@ a:hover { color: var(--primary-dark); }
 
 .field { display: block; }
 .field + .field { margin-top: 14px; }
+
+/* Input dengan tombol aksi di sampingnya (mis. salin token) — tombolnya
+   dijaga persegi 38px agar tingginya sama dengan input di sebelahnya. */
+.input-row { display: flex; align-items: center; gap: 8px; }
+.input-row .input { flex: 1; min-width: 0; }
+.input-row .btn-icon { flex: none; }
 .field-label {
   display: block;
   font-size: 11px;
@@ -831,6 +1313,96 @@ a:hover { color: var(--primary-dark); }
   box-shadow: var(--shadow-lg);
 }
 .modal-sm { width: 480px; padding: 28px 30px; }
+
+/* Dialog konfirmasi (ConfirmDialog, ganti window.confirm() bawaan browser).
+   Overlay terpisah dari .modal-overlay dan dipusatkan (bukan rata atas)
+   karena isinya selalu pendek — beda dari .modal yang menampung form
+   panjang. z-index lebih tinggi supaya tetap di atas bila terpicu saat
+   sebuah form modal sedang terbuka. */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 27, 46, .55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 60;
+}
+
+.confirm-box {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  width: 400px;
+  max-width: 100%;
+  padding: 28px 28px 26px;
+  box-shadow: var(--shadow-lg);
+  text-align: center;
+}
+
+.confirm-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.confirm-icon.is-danger { background: var(--danger-bg); color: var(--danger); }
+.confirm-icon svg { width: 24px; height: 24px; }
+
+.confirm-title { font-size: 16px; font-weight: 800; color: var(--text); line-height: 1.4; }
+.confirm-text { font-size: 13px; color: var(--text-muted); margin-top: 8px; line-height: 1.6; }
+
+.confirm-actions { display: flex; gap: 10px; margin-top: 24px; }
+.confirm-actions .btn { flex: 1; justify-content: center; }
+
+/* Isian opsional di dalam dialog — rata kiri, karena label dan teks yang
+   diketik lebih mudah dibaca begitu ketimbang ikut rata tengah kotaknya. */
+.confirm-prompt { text-align: left; margin-top: 18px; }
+.confirm-prompt .field-label { display: block; margin-bottom: 6px; }
+.confirm-prompt textarea { width: 100%; resize: vertical; font-family: inherit; }
+
+/* ── Aging tunggakan (Laporan Pembayaran) ──────────────────────────────────
+   Empat kotak umur tunggakan berjajar sama besar sengaja tanpa hierarki
+   ukuran — makin ke kanan makin lama menunggak, jadi urutannya sendiri
+   sudah bercerita. Garis kiri menyala hanya pada bucket yang benar-benar
+   berisi (count > 0), supaya kotak kosong tidak ikut menyala merah/kuning
+   dan terkesan ada masalah yang sebenarnya tidak ada. */
+.aging-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+@media (max-width: 720px) { .aging-row { grid-template-columns: repeat(2, 1fr); } }
+
+.aging-cell {
+  background: var(--bg-subtle);
+  border-left: 3px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+.aging-cell.is-warning { border-left-color: var(--warning); background: linear-gradient(90deg, var(--warning-bg) 0%, var(--bg-subtle) 22%); }
+.aging-cell.is-critical { border-left-color: var(--danger); background: linear-gradient(90deg, var(--danger-bg) 0%, var(--bg-subtle) 22%); }
+
+.aging-label { font-size: 10.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text-faint); }
+.aging-count { font-family: var(--font-mono); font-size: 19px; font-weight: 800; margin-top: 6px; }
+.aging-count small { font-size: 10px; font-weight: 600; color: var(--text-muted); }
+.aging-amount { font-family: var(--font-mono); font-size: 12px; color: var(--text-body); margin-top: 3px; }
+
+/* Bilah aksi yang muncul saat ada baris tercentang. */
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--primary-soft);
+  border: 1px solid #dbeafe;
+  font-size: 13px;
+  color: var(--text-body);
+}
+.bulk-bar .spacer { flex: 1; }
 
 /* ── Invoice ──────────────────────────────────────────────────────────── */
 
