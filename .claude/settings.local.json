@@ -32,7 +32,28 @@
       "Bash(grep -rniE 'selected|bulkAction|selectAll|pilih semua|checkAll|\\\\$selected' app/Livewire resources/views)",
       "Bash(php -l app/Livewire/Billing/PaymentPage.php)",
       "Bash(php -l resources/views/livewire/billing/payment-page.blade.php)",
-      "Bash(php -l app/Services/Billing/BulkPaymentService.php)"
+      "Bash(php -l app/Services/Billing/BulkPaymentService.php)",
+      "Bash(php -l database/seeders/DemoDataSeeder.php)",
+      "Bash(npx playwright *)",
+      "Read(//Applications/Google Chrome.app/**)",
+      "Read(//Applications/**)",
+      "Bash(npm -v)",
+      "Bash(npm i *)",
+      "Bash(node scripts/capture-guide-screenshots.mjs)",
+      "Bash(php -l app/Http/Controllers/GuideController.php)",
+      "Bash(php -l resources/views/guide/pdf.blade.php)",
+      "Bash(php -l resources/views/partials/sidebar.blade.php)",
+      "Bash(curl -s -o /tmp/panduan.pdf -w \"HTTP %{http_code}  ukuran %{size_download} byte  waktu %{time_total}s\\\\n\" -b /tmp/ck -c /tmp/ck http://127.0.0.1:8123/panduan)",
+      "Read(//tmp/**)",
+      "Bash(qlmanage -t -s 1400 -o /tmp/pv /tmp/panduan.pdf)",
+      "Bash(python3 -)",
+      "Bash(git check-ignore *)",
+      "Bash(sed -i '' \"s|storage/app/guide|resources/guide/screenshots|g\" scripts/capture-guide-screenshots.mjs)",
+      "Bash(sed -i '' -e 's|storage_path\\(\"app/guide/{$name}.jpg\"\\)|resource_path\\(\"guide/screenshots/{$name}.jpg\"\\)|g' resources/views/guide/pdf.blade.php)",
+      "Bash(php /tmp/gen.php)",
+      "Bash(python3 -c ' *)",
+      "Bash(pkill -f \"artisan serve --port=8123\")",
+      "Bash(rm -f /tmp/gen.php /tmp/html.php /tmp/pv-*.jpg)"
     ]
   }
 }

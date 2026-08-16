@@ -39,11 +39,23 @@
             @if (!isset($entry['items']))
                 {{-- Menu tunggal, mis. Dashboard --}}
                 @if ($visible($entry))
-                    <a href="{{ route($entry['route']) }}" wire:navigate
-                       class="sidebar-link{{ $isActive($entry) ? ' active' : '' }}">
-                        <i data-lucide="{{ $entry['icon'] }}" class="sidebar-icon"></i>
-                        <span>{{ $entry['title'] }}</span>
-                    </a>
+                    @if ($entry['external'] ?? false)
+                        {{-- Bukan halaman aplikasi (mis. berkas PDF): dibuka di tab
+                             baru, dan tanpa wire:navigate yang akan mencoba
+                             memuatnya sebagai potongan halaman. --}}
+                        <a href="{{ route($entry['route']) }}" target="_blank" rel="noopener"
+                           class="sidebar-link">
+                            <i data-lucide="{{ $entry['icon'] }}" class="sidebar-icon"></i>
+                            <span style="flex:1">{{ $entry['title'] }}</span>
+                            <i data-lucide="external-link" style="width:12px;height:12px;opacity:.5"></i>
+                        </a>
+                    @else
+                        <a href="{{ route($entry['route']) }}" wire:navigate
+                           class="sidebar-link{{ $isActive($entry) ? ' active' : '' }}">
+                            <i data-lucide="{{ $entry['icon'] }}" class="sidebar-icon"></i>
+                            <span>{{ $entry['title'] }}</span>
+                        </a>
+                    @endif
                 @endif
             @else
                 @php

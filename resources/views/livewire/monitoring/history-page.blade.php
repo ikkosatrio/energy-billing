@@ -95,7 +95,7 @@
                                 <div class="bar wbp" style="height:{{ $daily->kwh_wbp / $dailyMax * 100 }}%"></div>
                                 <div class="bar lwbp" style="height:{{ $daily->kwh_lwbp / $dailyMax * 100 }}%"></div>
                             </div>
-                            <div class="bar-label">{{ $daily->date->day % 2 === 1 ? $daily->date->day : '' }}</div>
+                            <div class="bar-label">{{ $daily->date->day }}</div>
                         </div>
                     @endforeach
                 </div>

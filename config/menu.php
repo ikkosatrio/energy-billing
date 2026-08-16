@@ -187,6 +187,12 @@ return [
                 'icon' => 'history',
                 'permits' => ['activity_log.view'],
             ],
+            [
+                'title' => 'Hapus Data Uji Coba',
+                'route' => 'system.trial-data.index',
+                'icon' => 'eraser',
+                'permits' => ['reading.wipe_trial'],
+            ],
             // [
             //     'title' => 'Dokumentasi API',
             //     'route' => 'l5-swagger.default.api',
@@ -197,6 +203,17 @@ return [
             //     'external' => true,
             // ],
         ],
+    ],
+
+    // Paling bawah dan tanpa syarat izin — yang paling membutuhkannya adalah
+    // staf baru, dan merekalah yang izinnya paling sedikit. Dibuka di tab baru
+    // karena isinya berkas PDF, bukan halaman aplikasi.
+    [
+        'title' => 'Buku Panduan',
+        'route' => 'guide.show',
+        'icon' => 'book-open',
+        'permits' => [],
+        'external' => true,
     ],
 
 ];

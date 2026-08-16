@@ -5,6 +5,7 @@ use App\Http\Controllers\Billing\BillingPeriodController;
 use App\Http\Controllers\Billing\InvoiceController;
 use App\Http\Controllers\Billing\PaymentController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\GuideController;
 use App\Http\Controllers\Master\CustomerController;
 use App\Http\Controllers\Master\PowerMeterController;
 use App\Http\Controllers\Monitoring\DeviceController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Report\ReportController;
 use App\Http\Controllers\System\ActivityLogController;
 use App\Http\Controllers\System\RoleController;
 use App\Http\Controllers\System\SettingController;
+use App\Http\Controllers\System\TrialDataWipeController;
 use App\Http\Controllers\System\UserController;
 use App\Http\Controllers\Tariff\TariffGroupController;
 use App\Http\Controllers\Tariff\TariffScheduleController;
@@ -44,6 +46,11 @@ Route::middleware('auth')->group(function () {
     Route::get('/', fn () => redirect()->route('dashboard'))->name('home');
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Buku Panduan — sengaja tanpa syarat izin: staf baru justru yang paling
+    // membutuhkannya, dan merekalah yang izinnya paling sedikit.
+    Route::get('/panduan', [GuideController::class, 'show'])->name('guide.show');
+    Route::get('/panduan/unduh', [GuideController::class, 'download'])->name('guide.download');
 
     // ── Monitoring ───────────────────────────────────────────────────────
     Route::prefix('monitoring')->name('monitoring.')->middleware('can:monitoring.view')->group(function () {
@@ -120,5 +127,8 @@ Route::middleware('auth')->group(function () {
 
         Route::get('activity-logs', [ActivityLogController::class, 'index'])
             ->middleware('can:activity_log.view')->name('activity-logs.index');
+
+        Route::get('trial-data', [TrialDataWipeController::class, 'index'])
+            ->middleware('can:reading.wipe_trial')->name('trial-data.index');
     });
 });

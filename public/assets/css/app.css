@@ -683,6 +683,10 @@ a:hover { color: var(--primary-dark); }
   min-height: 0;
   width: 100%;
   padding-top: 15px;
+  /* Garis dasar bersama — tanpa ini, batang bernilai mirip (jadi tingginya
+     nyaris sama) mudah terbaca seolah "menggantung rata atas", padahal
+     sudah rata bawah; garis ini membuktikannya kasat mata. */
+  border-bottom: 1px solid var(--border);
 }
 /* Tanpa ini batang ikut mengecil untuk memberi tempat pada label, dan tinggi
    batang tidak lagi sebanding dengan angkanya. */

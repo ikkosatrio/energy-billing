@@ -66,6 +66,7 @@ class RolePermissionSeeder extends Seeder
             'role.view' => 'Lihat role',
             'role.manage' => 'Kelola role & hak akses',
             'activity_log.view' => 'Lihat log aktivitas',
+            'reading.wipe_trial' => 'Hapus data mentah & agregat harian per rentang tanggal (data uji coba)',
         ],
     ];
 
