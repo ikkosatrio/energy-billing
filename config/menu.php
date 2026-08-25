@@ -182,6 +182,13 @@ return [
                 'permits' => ['role.view'],
             ],
             [
+                'title' => 'Akun Portal Pelanggan',
+                'route' => 'system.customer-users.index',
+                'active' => 'system.customer-users.*',
+                'icon' => 'contact',
+                'permits' => ['customer_user.view'],
+            ],
+            [
                 'title' => 'Log Aktivitas',
                 'route' => 'system.activity-logs.index',
                 'icon' => 'history',

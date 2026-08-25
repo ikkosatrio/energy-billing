@@ -13,6 +13,7 @@ use App\Http\Controllers\Monitoring\HistoryController;
 use App\Http\Controllers\Monitoring\RealtimeController;
 use App\Http\Controllers\Report\ReportController;
 use App\Http\Controllers\System\ActivityLogController;
+use App\Http\Controllers\System\CustomerUserController;
 use App\Http\Controllers\System\RoleController;
 use App\Http\Controllers\System\SettingController;
 use App\Http\Controllers\System\TrialDataWipeController;
@@ -124,6 +125,9 @@ Route::middleware('auth')->group(function () {
 
         Route::get('roles', [RoleController::class, 'index'])
             ->middleware('can:role.view')->name('roles.index');
+
+        Route::get('customer-users', [CustomerUserController::class, 'index'])
+            ->middleware('can:customer_user.view')->name('customer-users.index');
 
         Route::get('activity-logs', [ActivityLogController::class, 'index'])
             ->middleware('can:activity_log.view')->name('activity-logs.index');
