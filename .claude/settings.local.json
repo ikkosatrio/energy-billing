@@ -53,7 +53,18 @@
       "Bash(php /tmp/gen.php)",
       "Bash(python3 -c ' *)",
       "Bash(pkill -f \"artisan serve --port=8123\")",
-      "Bash(rm -f /tmp/gen.php /tmp/html.php /tmp/pv-*.jpg)"
+      "Bash(rm -f /tmp/gen.php /tmp/html.php /tmp/pv-*.jpg)",
+      "Bash(php -l app/Livewire/Dashboard/DeviceStatusWidget.php)",
+      "Bash(php -l resources/views/livewire/dashboard/device-status-widget.blade.php)",
+      "Bash(git stash *)",
+      "Bash(git fsck *)",
+      "Bash(git checkout *)",
+      "Bash(git reset *)",
+      "Bash(DB_DATABASE_MAIN=energy_billing_test APP_ENV=testing php artisan migrate --force)",
+      "Bash(DB_DATABASE_MAIN=energy_billing_test APP_ENV=testing php artisan migrate:fresh --force)",
+      "Bash(pkill -f \"artisan serve\")",
+      "Bash(pkill -f \"artisan queue\")",
+      "Bash(git add *)"
     ]
   }
 }
