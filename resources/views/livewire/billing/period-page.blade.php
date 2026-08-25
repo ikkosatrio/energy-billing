@@ -24,10 +24,6 @@
                 <div class="input mono" style="background:var(--bg-subtle)">{{ $billableCount }}</div>
             </div>
             <div class="spacer"></div>
-            <label class="checkbox-row" style="margin:0 12px 8px 0">
-                <input type="checkbox" wire:model="regenerate">
-                <span>Buat ulang invoice draft</span>
-            </label>
             @can('invoice.generate')
                 <button type="button" class="btn btn-primary" wire:click="generate" wire:loading.attr="disabled">
                     <i data-lucide="file-plus-2" style="width:15px;height:15px"></i>
@@ -47,7 +43,7 @@
         @if ($result)
             <div class="alert {{ $result['failed'] ? 'alert-warning' : 'alert-success' }}" style="margin-top:16px">
                 <strong>{{ $result['created'] }} invoice dibuat</strong>, {{ $result['skipped'] }} dilewati
-                (sudah punya invoice di periode ini).
+                (invoicenya sudah terbit, tidak ditimpa).
                 @if ($result['failed'])
                     <ul style="margin:8px 0 0;padding-left:18px">
                         @foreach ($result['failed'] as $failure)

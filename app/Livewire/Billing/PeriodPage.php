@@ -14,8 +14,6 @@ class PeriodPage extends Component
     /** Bulan yang akan digenerate, format Y-m. */
     public string $month = '';
 
-    public bool $regenerate = false;
-
     /** Hasil generate terakhir, ditampilkan sebagai ringkasan. */
     public ?array $result = null;
 
@@ -37,7 +35,11 @@ class PeriodPage extends Component
             return;
         }
 
-        $this->result = $generator->generate($period, $this->regenerate);
+        // Selalu buat ulang: invoice draft dihitung ulang dengan data terbaru
+        // supaya angka yang salah bisa langsung diperbaiki dengan generate
+        // ulang. Invoice yang sudah terbit tetap tidak tersentuh — lihat
+        // InvoiceGenerator::generate().
+        $this->result = $generator->generate($period, regenerate: true);
 
         $message = "{$this->result['created']} invoice dibuat, {$this->result['skipped']} dilewati.";
         $this->dispatch('toast',
