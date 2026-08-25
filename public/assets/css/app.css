@@ -1429,6 +1429,19 @@ a:hover { color: var(--primary-dark); }
 .invoice-table thead tr { background: var(--bg-subtle); }
 .invoice-table th { border-bottom: 0; color: var(--text-muted); padding: 11px 12px; }
 
+/* Satuan pada judul kolom — di baris kedua, dan dibuat lebih redup dari nama
+   kolomnya supaya yang terbaca lebih dulu tetap "apa isinya", bukan
+   "satuannya apa". Bentuknya disamakan dengan PDF invoice. */
+.th-unit {
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-faint);
+}
+
 .invoice-totals { display: flex; justify-content: flex-end; }
 .invoice-totals-inner { width: 320px; display: flex; flex-direction: column; gap: 9px; }
 .invoice-total-row { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-body); }

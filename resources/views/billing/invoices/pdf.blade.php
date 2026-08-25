@@ -24,6 +24,11 @@
     table.lines th { background: #f8fafc; font-size: 9px; letter-spacing: 1px; color: #64748b;
                      text-align: right; padding: 8px 7px; }
     table.lines th:first-child { text-align: left; }
+    /* Satuan di baris kedua judul kolom. Pemisah barisnya memakai <br>, bukan
+       display:block — dukungan DomPDF terhadap display pada elemen inline di
+       dalam sel tabel tidak pasti, sementara <br> selalu jalan. Span-nya cukup
+       mengatur ukuran dan warna. */
+    table.lines th .unit { font-size: 8px; letter-spacing: 0; font-weight: normal; color: #94a3b8; }
     table.lines td { padding: 8px 7px; border-bottom: 1px solid #f1f5f9; text-align: right; }
     table.lines td:first-child { text-align: left; }
     .totals { width: 46%; margin-left: 54%; margin-top: 14px; border-collapse: collapse; }
@@ -110,13 +115,16 @@
 
   <table class="lines">
     <thead>
+      {{-- Satuan ditulis di judul kolom, bukan diulang di tiap sel: pelanggan
+           perlu tahu angkanya rupiah atau kWh, tapi mengulangnya 4 baris ke
+           bawah membuat kolomnya melebar dan angkanya jadi sulit disejajarkan. --}}
       <tr>
         <th>URAIAN</th>
-        <th>STAND AWAL</th>
-        <th>STAND AKHIR</th>
-        <th>kWh</th>
-        <th>TARIF</th>
-        <th>SUBTOTAL</th>
+        <th>STAND AWAL<br><span class="unit">kWh</span></th>
+        <th>STAND AKHIR<br><span class="unit">kWh</span></th>
+        <th>PEMAKAIAN<br><span class="unit">kWh</span></th>
+        <th>TARIF<br><span class="unit">Rp/kWh</span></th>
+        <th>SUBTOTAL<br><span class="unit">Rp</span></th>
       </tr>
     </thead>
     <tbody>
@@ -182,7 +190,7 @@
           <th>Riwayat Pembayaran</th>
           <th>No Kuitansi</th>
           <th>Metode</th>
-          <th>Jumlah</th>
+          <th>Jumlah<br><span class="unit">Rp</span></th>
         </tr>
       </thead>
       <tbody>

@@ -126,10 +126,10 @@
                         <th>Pelanggan</th>
                         <th>Meter</th>
                         <th>Periode</th>
-                        <th class="num">LWBP</th>
-                        <th class="num">WBP</th>
-                        <th class="num">Tagihan</th>
-                        <th class="num">Sisa</th>
+                        <th class="num">LWBP<span class="th-unit">kWh</span></th>
+                        <th class="num">WBP<span class="th-unit">kWh</span></th>
+                        <th class="num">Tagihan<span class="th-unit">Rp</span></th>
+                        <th class="num">Sisa<span class="th-unit">Rp</span></th>
                         <th>Status</th>
                         <th></th>
                     </tr>
@@ -155,9 +155,12 @@
                             </td>
                             <td class="num">{{ kwh($invoice->kwh_lwbp) }}</td>
                             <td class="num">{{ kwh($invoice->kwh_wbp) }}</td>
-                            <td class="num strong">{{ rupiah($invoice->total_amount) }}</td>
+                            {{-- Tanpa awalan "Rp" di tiap baris: satuannya sudah ada di
+                                 judul kolom, dan mengulangnya membuat angka rata kanan
+                                 jadi bergerigi karena panjang awalannya ikut dihitung. --}}
+                            <td class="num strong">{{ rupiah($invoice->total_amount, false) }}</td>
                             <td class="num" style="color:{{ $invoice->outstanding > 0 ? 'var(--danger)' : 'var(--success)' }}">
-                                {{ rupiah($invoice->outstanding) }}
+                                {{ rupiah($invoice->outstanding, false) }}
                             </td>
                             <td><x-invoice-status :status="$invoice->status" /></td>
                             <td class="text-right nowrap" wire:click.stop>
@@ -253,13 +256,16 @@
                 <div class="table-wrap">
                     <table class="table invoice-table">
                         <thead>
+                            {{-- Satuan ditulis di judul kolom, bukan di tiap sel:
+                                 angkanya jadi tetap rata kanan dan mudah
+                                 dibandingkan antar baris. --}}
                             <tr>
                                 <th>Uraian</th>
-                                <th class="num">Stand Awal</th>
-                                <th class="num">Stand Akhir</th>
-                                <th class="num">kWh</th>
-                                <th class="num">Tarif</th>
-                                <th class="num">Subtotal</th>
+                                <th class="num">Stand Awal<span class="th-unit">kWh</span></th>
+                                <th class="num">Stand Akhir<span class="th-unit">kWh</span></th>
+                                <th class="num">Pemakaian<span class="th-unit">kWh</span></th>
+                                <th class="num">Tarif<span class="th-unit">Rp/kWh</span></th>
+                                <th class="num">Subtotal<span class="th-unit">Rp</span></th>
                             </tr>
                         </thead>
                         <tbody>
