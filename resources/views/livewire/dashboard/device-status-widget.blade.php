@@ -6,11 +6,25 @@
         <div class="device-widget-title">
             <div>
                 <div class="card-title">Real-time Perangkat</div>
-                <div class="card-sub">{{ $meters->count() }} power meter aktif · kondisi live</div>
+                <div class="card-sub">
+                    {{ $meters->count() }} power meter
+                    {{ $phaseFilter ? 'ditampilkan dari '.$phaseCounts['all'].' aktif' : 'aktif' }} · kondisi live
+                </div>
             </div>
             @if ($attentionCount > 0)
                 <span class="badge badge-warning badge-square">{{ $attentionCount }} perlu perhatian</span>
             @endif
+        </div>
+
+        {{-- Filter jenis sambungan — sama persis dengan Real-time Monitoring
+             supaya satu kontrol cukup dipelajari sekali. --}}
+        <div class="field" style="min-width:170px;margin-left:14px">
+            <x-select-search wire:model.live="phaseFilter"
+                :options="[
+                    ['value' => '', 'label' => 'Semua jenis', 'sub' => $phaseCounts['all'].' perangkat'],
+                    ['value' => '3', 'label' => '3 Phase', 'sub' => $phaseCounts['3'].' perangkat'],
+                    ['value' => '1', 'label' => '1 Phase', 'sub' => $phaseCounts['1'].' perangkat'],
+                ]" />
         </div>
 
         <div class="spacer"></div>
@@ -41,7 +55,11 @@
     </div>
 
     @if ($meters->isEmpty())
-        <div class="table-empty">Belum ada power meter aktif.</div>
+        <div class="table-empty">
+            {{ $phaseFilter
+                ? 'Tidak ada perangkat '.($phaseFilter === '1' ? '1 phase' : '3 phase').' yang aktif.'
+                : 'Belum ada power meter aktif.' }}
+        </div>
     @else
         @php
             // Desimal hanya berguna selama angkanya kecil; pada puluhan ribu kWh

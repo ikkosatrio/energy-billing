@@ -85,31 +85,76 @@ class DashboardDeviceWidgetTest extends TestCase
             ->assertDontSee('Invoice Terbaru');
     }
 
-    public function test_meter_offline_tampil_lebih_dulu_daripada_normal(): void
+    /**
+     * Urutan mengikuti ID meter, bukan urgensi maupun abjad.
+     *
+     * Panel ini menyegarkan diri tiap 30 detik. Kalau urutannya mengikuti
+     * status, kartu berpindah tempat sendiri begitu ada meter yang berubah
+     * jadi offline — dan perangkat yang sedang diamati operator ikut bergeser.
+     */
+    public function test_kartu_diurutkan_berdasarkan_id_meter(): void
     {
         $this->meter(['name' => 'Z Normal', 'last_seen_at' => now()]);
         $this->meter(['name' => 'A Offline', 'last_seen_at' => now()->subHours(2)]);
+        $this->meter(['name' => 'M Maintenance', 'status' => 'maintenance', 'last_seen_at' => now()]);
 
         $order = Livewire::test(DeviceStatusWidget::class)
             ->viewData('meters')
             ->pluck('name')
             ->all();
 
-        $this->assertSame(['A Offline', 'Z Normal'], $order);
+        // Urutan pembuatan, bukan abjad dan bukan status.
+        $this->assertSame(['Z Normal', 'A Offline', 'M Maintenance'], $order);
     }
 
-    public function test_maintenance_tampil_setelah_offline_tapi_sebelum_normal(): void
+    public function test_urutan_tidak_berubah_saat_ada_meter_jadi_offline(): void
     {
-        $this->meter(['name' => 'Normal', 'last_seen_at' => now()]);
-        $this->meter(['name' => 'Sedang Maintenance', 'status' => 'maintenance', 'last_seen_at' => now()]);
-        $this->meter(['name' => 'Sedang Offline', 'last_seen_at' => now()->subHours(2)]);
+        $satu = $this->meter(['name' => 'Panel Satu', 'last_seen_at' => now()]);
+        $this->meter(['name' => 'Panel Dua', 'last_seen_at' => now()]);
 
-        $order = Livewire::test(DeviceStatusWidget::class)
-            ->viewData('meters')
-            ->pluck('name')
-            ->all();
+        $sebelum = Livewire::test(DeviceStatusWidget::class)->viewData('meters')->pluck('name')->all();
 
-        $this->assertSame(['Sedang Offline', 'Sedang Maintenance', 'Normal'], $order);
+        $satu->forceFill(['last_seen_at' => now()->subHours(2)])->save();
+
+        $sesudah = Livewire::test(DeviceStatusWidget::class)->viewData('meters')->pluck('name')->all();
+
+        $this->assertSame($sebelum, $sesudah);
+    }
+
+    public function test_filter_phase_menyaring_kartu(): void
+    {
+        $this->meter(['name' => 'Tiga Phase', 'phase' => '3', 'last_seen_at' => now()]);
+        $this->meter(['name' => 'Satu Phase', 'phase' => '1', 'last_seen_at' => now()]);
+
+        $component = Livewire::test(DeviceStatusWidget::class);
+
+        $this->assertCount(2, $component->viewData('meters'));
+
+        $component->set('phaseFilter', '1');
+        $this->assertSame(['Satu Phase'], $component->viewData('meters')->pluck('name')->all());
+
+        $component->set('phaseFilter', '3');
+        $this->assertSame(['Tiga Phase'], $component->viewData('meters')->pluck('name')->all());
+
+        $component->set('phaseFilter', '');
+        $this->assertCount(2, $component->viewData('meters'));
+    }
+
+    public function test_jumlah_per_phase_dihitung_dari_seluruh_meter_aktif(): void
+    {
+        $this->meter(['phase' => '3', 'last_seen_at' => now()]);
+        $this->meter(['phase' => '3', 'last_seen_at' => now()]);
+        $this->meter(['phase' => '1', 'last_seen_at' => now()]);
+        // Nonaktif tidak dihitung — tidak pernah muncul di panel ini.
+        $this->meter(['phase' => '1', 'status' => 'inactive']);
+
+        $counts = Livewire::test(DeviceStatusWidget::class)
+            // Angkanya harus tetap utuh walau sedang difilter, karena dipakai
+            // sebagai label pilihan filter itu sendiri.
+            ->set('phaseFilter', '1')
+            ->viewData('phaseCounts');
+
+        $this->assertSame(['1' => 1, '3' => 2, 'all' => 3], $counts);
     }
 
     public function test_beban_tinggi_dihitung_dari_daya_kva_pelanggan(): void

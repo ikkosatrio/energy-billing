@@ -16,21 +16,15 @@ use Livewire\Component;
  * Real-time Monitoring: kW+PF, tegangan/arus tiap jalur, dan kWh hari
  * ini/bulan ini.
  *
- * Diurutkan berdasarkan urgensi (offline/maintenance/beban tinggi dulu),
- * bukan alfabet — dashboard ini untuk memutuskan cepat apa yang perlu
- * ditindaklanjuti, jadi perangkat bermasalah harus langsung terlihat di
- * pojok kiri atas tanpa perlu menggulir.
+ * Diurutkan berdasarkan ID meter supaya letak tiap kartu tetap sama setiap
+ * kali halaman disegarkan. Sempat diurutkan berdasarkan urgensi, tapi pada
+ * panel yang menyegarkan diri tiap 30 detik itu justru menyulitkan: kartu
+ * berpindah tempat sendiri saat status berubah, dan mata harus mencari ulang
+ * perangkat yang tadi sedang dilihat. Yang perlu perhatian tetap mudah
+ * ditemukan lewat badge merah dan penghitung "N perlu perhatian".
  */
 class DeviceStatusWidget extends Component
 {
-    /** Urutan prioritas label status; makin kecil makin butuh perhatian. */
-    private const STATUS_PRIORITY = [
-        'Offline' => 0,
-        'Maintenance' => 1,
-        'Beban Tinggi' => 2,
-        'Normal' => 3,
-    ];
-
     private UsageSummaryService $usage;
 
     public function boot(UsageSummaryService $usage): void
@@ -51,6 +45,9 @@ class DeviceStatusWidget extends Component
     #[Session(key: 'dashboard.device-refresh')]
     public int $refreshEvery = 30;
 
+    /** Kosong = semua jenis sambungan. Sama seperti Real-time Monitoring. */
+    public string $phaseFilter = '';
+
     public function updatedRefreshEvery(int $value): void
     {
         if ($value !== 0 && !array_key_exists($value, self::REFRESH_OPTIONS)) {
@@ -69,21 +66,39 @@ class DeviceStatusWidget extends Component
         $meters = PowerMeter::query()
             ->with(['customer:id,power_meter_id,name,daya_kva,tariff_group_id', 'latestReading', 'deviceStatus'])
             ->where('status', '!=', 'inactive')
-            ->orderBy('name')
+            ->when($this->phaseFilter, fn ($q) => $q->where('phase', $this->phaseFilter))
+            ->orderBy('id')
             ->get();
 
-        // Digabung sebagai satu paket [meter, kartu] dulu supaya urutan
-        // status dan meter tidak bisa saling lepas saat diurutkan ulang.
-        $ordered = $meters
-            ->map(fn (PowerMeter $meter) => ['meter' => $meter, 'card' => $meter->statusBadge()])
-            ->sortBy(fn ($row) => sprintf('%d-%s', self::STATUS_PRIORITY[$row['card']['status']] ?? 9, $row['meter']->name))
-            ->values();
+        $cards = $meters->map(fn (PowerMeter $meter) => $meter->statusBadge());
 
         return view('livewire.dashboard.device-status-widget', [
-            'meters' => $ordered->pluck('meter'),
-            'cards' => $ordered->pluck('card')->all(),
+            'meters' => $meters,
+            'cards' => $cards->all(),
             'usage' => $this->usage->forMeters($meters),
-            'attentionCount' => $ordered->filter(fn ($row) => $row['card']['status'] !== 'Normal')->count(),
+            'attentionCount' => $cards->filter(fn ($card) => $card['status'] !== 'Normal')->count(),
+            'phaseCounts' => $this->phaseCounts(),
         ]);
+    }
+
+    /**
+     * Jumlah meter per jenis sambungan, dipakai sebagai label pada filter
+     * supaya terlihat ada berapa sebelum filternya dipilih.
+     *
+     * @return array{1:int, 3:int, all:int}
+     */
+    private function phaseCounts(): array
+    {
+        $counts = PowerMeter::query()
+            ->where('status', '!=', 'inactive')
+            ->selectRaw('phase, COUNT(*) AS jumlah')
+            ->groupBy('phase')
+            ->pluck('jumlah', 'phase');
+
+        return [
+            '1' => (int) ($counts['1'] ?? 0),
+            '3' => (int) ($counts['3'] ?? 0),
+            'all' => (int) $counts->sum(),
+        ];
     }
 }
