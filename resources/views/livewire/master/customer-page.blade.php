@@ -38,7 +38,6 @@
                         <th>Meter</th>
                         <th>Golongan</th>
                         <th>Tgl Tagih</th>
-                        <th class="num">kWh Bulan Ini</th>
                         <th>Status</th>
                         <th></th>
                     </tr>
@@ -61,9 +60,6 @@
                                     <div class="sub">default</div>
                                 @endunless
                             </td>
-                            <td class="num">
-                                {{ kwh($usageThisMonth[$customer->power_meter_id] ?? 0) }}
-                            </td>
                             <td>
                                 <span class="badge {{ $customer->status === 'active' ? 'badge-success' : 'badge-neutral' }}">
                                     {{ $customer->status === 'active' ? 'Aktif' : 'Nonaktif' }}
@@ -85,7 +81,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="8" class="table-empty">
+                            <td colspan="7" class="table-empty">
                                 {{ $search || $statusFilter ? 'Tidak ada pelanggan yang cocok dengan filter.' : 'Belum ada pelanggan. Tambahkan lewat tombol di atas.' }}
                             </td>
                         </tr>

@@ -3,7 +3,6 @@
 namespace App\Livewire\Master;
 
 use App\Models\Customer;
-use App\Models\MeterReadingDaily;
 use App\Models\PowerMeter;
 use App\Models\TariffGroup;
 use App\Services\ActivityLogger;
@@ -221,7 +220,6 @@ class CustomerPage extends Component
 
         return view('livewire.master.customer-page', [
             'customers' => $customers,
-            'usageThisMonth' => $this->usageThisMonth($customers->pluck('power_meter_id')->filter()->all()),
             // Meter yang belum dipakai pelanggan lain, plus meter milik
             // pelanggan yang sedang diedit agar tetap muncul terpilih.
             'availableMeters' => PowerMeter::query()
@@ -236,26 +234,4 @@ class CustomerPage extends Component
         ]);
     }
 
-    /**
-     * Pemakaian kWh bulan berjalan per meter, diambil sekali untuk seluruh
-     * baris di halaman agar tidak menimbulkan query N+1.
-     *
-     * @param  array<int>  $meterIds
-     * @return array<int, float>
-     */
-    private function usageThisMonth(array $meterIds): array
-    {
-        if (empty($meterIds)) {
-            return [];
-        }
-
-        return MeterReadingDaily::query()
-            ->whereIn('power_meter_id', $meterIds)
-            ->between(now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString())
-            ->selectRaw('power_meter_id, SUM(kwh_lwbp + kwh_wbp) AS total')
-            ->groupBy('power_meter_id')
-            ->pluck('total', 'power_meter_id')
-            ->map(fn ($v) => (float) $v)
-            ->all();
-    }
 }
