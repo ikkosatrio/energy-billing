@@ -12,11 +12,30 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // Agregat harian menyegarkan chart bulan berjalan sekaligus menangkap
-        // pembacaan yang datang terlambat dari gateway.
+        /*
+         * Agregat harian dijalankan dua lapis.
+         *
+         * Per menit, hanya hari ini: menyegarkan chart bulan berjalan
+         * mendekati real-time. Perintahnya menghitung ulang satu hari penuh
+         * tiap kali jalan, jadi dibatasi satu tanggal agar bebannya tidak
+         * dobel. Kalau satu run belum selesai saat menit berikutnya tiba,
+         * withoutOverlapping melewatinya — jadwalnya efektif menyesuaikan
+         * diri dengan kemampuan server, bukan menumpuk.
+         *
+         * Per jam, kemarin ikut diulang: menangkap pembacaan yang datang
+         * terlambat dari gateway, termasuk yang masuk setelah tengah malam.
+         *
+         * Masa kunci withoutOverlapping dipersempit ke 5 menit; default
+         * Laravel 24 jam berarti satu proses yang mati mendadak tanpa
+         * melepas kunci bisa mendiamkan agregasi sehari penuh.
+         */
+        $schedule->command('readings:aggregate --today')
+            ->everyMinute()
+            ->withoutOverlapping(5);
+
         $schedule->command('readings:aggregate')
             ->hourly()
-            ->withoutOverlapping();
+            ->withoutOverlapping(5);
 
         // Generate invoice dijalankan tiap hari karena tanggal tagih boleh
         // berbeda per pelanggan; perintahnya sendiri yang menentukan pelanggan
