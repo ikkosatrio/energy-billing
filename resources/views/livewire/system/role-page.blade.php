@@ -5,8 +5,13 @@
             <div>
                 <div class="card-title">Role &amp; Hak Akses</div>
                 <div class="card-sub">
-                    Hak akses ditentukan per role. Super Admin selalu punya akses penuh dan
-                    daftar izinnya tidak perlu diatur.
+                    @if ($isPortal)
+                        Role untuk akun login pelanggan. Menentukan menu apa yang tampil di portal —
+                        bukan data pelanggan mana yang terlihat, itu diatur per akun.
+                    @else
+                        Hak akses ditentukan per role. Super Admin selalu punya akses penuh dan
+                        daftar izinnya tidak perlu diatur.
+                    @endif
                 </div>
             </div>
             @can('role.manage')
@@ -15,6 +20,20 @@
                     Tambah Role
                 </button>
             @endcan
+        </div>
+
+        {{-- Staf dan portal punya kosakata permission yang berbeda; tab ini
+             yang memastikan permission staf tidak pernah bisa tercentang pada
+             role pelanggan. --}}
+        <div class="segmented" role="group" aria-label="Jenis role" style="margin-top:14px">
+            <button type="button"
+                    class="segmented-option {{ $isPortal ? '' : 'is-on' }}"
+                    @if (!$isPortal) aria-pressed="true" @endif
+                    wire:click="$set('guardTab', 'web')">Staf</button>
+            <button type="button"
+                    class="segmented-option {{ $isPortal ? 'is-on' : '' }}"
+                    @if ($isPortal) aria-pressed="true" @endif
+                    wire:click="$set('guardTab', 'customer')">Portal Pelanggan</button>
         </div>
     </div>
 
@@ -27,7 +46,7 @@
                         <th>Slug</th>
                         <th>Keterangan</th>
                         <th class="num">Izin</th>
-                        <th class="num">User</th>
+                        <th class="num">Akun</th>
                         <th></th>
                     </tr>
                 </thead>
@@ -45,7 +64,7 @@
                             <td class="num">
                                 {{ $role->isSuperAdmin() ? 'Semua' : $role->permissions_count }}
                             </td>
-                            <td class="num">{{ $role->users_count }}</td>
+                            <td class="num">{{ $isPortal ? $role->customer_users_count : $role->users_count }}</td>
                             <td class="text-right nowrap">
                                 @can('role.manage')
                                     <span class="link-action" wire:click="edit({{ $role->id }})" style="margin-right:12px">Ubah</span>

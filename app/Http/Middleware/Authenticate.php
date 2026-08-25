@@ -7,15 +7,20 @@ use Illuminate\Auth\Middleware\Authenticate as Middleware;
 class Authenticate extends Middleware
 {
     /**
-     * Get the path the user should be redirected to when they are not authenticated.
+     * Halaman login mana yang dituju saat belum terautentikasi.
      *
-     * @param  \Illuminate\Http\Request  $request
-     * @return string|null
+     * Dibedakan per area: pengunjung portal yang sesinya habis harus kembali
+     * ke login portal, bukan ke login staf — di sana ia tidak punya akun sama
+     * sekali, jadi form staf hanya jadi jalan buntu.
      */
     protected function redirectTo($request)
     {
-        if (! $request->expectsJson()) {
-            return route('login');
+        if ($request->expectsJson()) {
+            return null;
         }
+
+        return $request->is('portal', 'portal/*')
+            ? route('portal.login')
+            : route('login');
     }
 }

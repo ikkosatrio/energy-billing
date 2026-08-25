@@ -41,7 +41,10 @@ class UserPage extends Component
             'form.username' => ['required', 'string', 'max:50', Rule::unique('users', 'username')->ignore($this->editingId)],
             // 'email:filter' menolak CRLF; lihat catatan keamanan di README.
             'form.email' => ['required', 'email:filter', 'max:255', Rule::unique('users', 'email')->ignore($this->editingId)],
-            'form.role_id' => ['required', 'exists:roles,id'],
+            // Dibatasi guard 'web': tanpa itu, payload yang dikarang bisa
+            // menyematkan role portal ke akun staf, dan akun itu jadi tidak
+            // bisa membuka satu pun halaman admin.
+            'form.role_id' => ['required', Rule::exists('roles', 'id')->where('guard', 'web')],
             'form.phone' => ['nullable', 'string', 'max:50'],
             'form.is_active' => ['boolean'],
             // Wajib saat membuat user baru; saat mengubah, kosong berarti
@@ -168,7 +171,10 @@ class UserPage extends Component
                 }))
                 ->orderBy('name')
                 ->paginate(15),
-            'roles' => Role::orderBy('name')->get(['id', 'name', 'description']),
+            // Hanya role staf: role portal tidak punya permission apa pun yang
+            // berlaku di panel admin, jadi memberikannya ke user staf hanya
+            // menghasilkan akun yang tidak bisa membuka apa-apa.
+            'roles' => Role::staff()->orderBy('name')->get(['id', 'name', 'description']),
         ]);
     }
 }

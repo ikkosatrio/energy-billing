@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\CustomerUser;
 use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Database\Seeder;
@@ -67,6 +68,57 @@ class RolePermissionSeeder extends Seeder
             'role.manage' => 'Kelola role & hak akses',
             'activity_log.view' => 'Lihat log aktivitas',
             'reading.wipe_trial' => 'Hapus data mentah & agregat harian per rentang tanggal (data uji coba)',
+            'customer_user.view' => 'Lihat akun portal pelanggan',
+            'customer_user.manage' => 'Kelola akun portal pelanggan & pelanggan yang diaksesnya',
+        ],
+    ];
+
+    /**
+     * Permission portal pelanggan (guard 'customer').
+     *
+     * Dipisah dari PERMISSIONS di atas supaya tidak pernah bisa dipilih saat
+     * menyusun role staf, dan sebaliknya — pemisahnya kolom `guard`, bukan
+     * kedisiplinan operator.
+     *
+     * Slug diberi awalan `portal.` karena `permissions.slug` unique lintas
+     * guard. Awalan itu sekaligus membuat @can di Blade portal terbaca jelas
+     * bukan permission staf.
+     *
+     * group => [slug => label]
+     */
+    private const PORTAL_PERMISSIONS = [
+        'Portal Pelanggan' => [
+            'portal.monitoring.view' => 'Lihat monitoring real-time & riwayat energi',
+            'portal.usage.view' => 'Lihat rekap pemakaian kWh',
+            'portal.invoice.view' => 'Lihat & unduh invoice',
+            'portal.payment.view' => 'Lihat pembayaran & unduh kuitansi',
+        ],
+    ];
+
+    /**
+     * Role portal bawaan. Slug berawalan `portal-` agar tidak bertabrakan
+     * dengan role staf pada indeks unique `roles.slug`.
+     */
+    private const PORTAL_ROLES = [
+        'portal-penuh' => [
+            'name' => 'Pelanggan (Penuh)',
+            'description' => 'Melihat monitoring, rekap pemakaian, invoice, dan kuitansi pembayaran.',
+            'permissions' => [
+                'portal.monitoring.view',
+                'portal.usage.view',
+                'portal.invoice.view',
+                'portal.payment.view',
+            ],
+        ],
+        // Untuk pihak yang perlu memantau pemakaian tapi tidak berkepentingan
+        // dengan nominal tagihan — mis. teknisi gedung atau manajer operasional.
+        'portal-pantau' => [
+            'name' => 'Pelanggan (Pantau Saja)',
+            'description' => 'Hanya monitoring dan rekap pemakaian kWh, tanpa invoice dan nominal tagihan.',
+            'permissions' => [
+                'portal.monitoring.view',
+                'portal.usage.view',
+            ],
         ],
     ];
 
@@ -122,27 +174,51 @@ class RolePermissionSeeder extends Seeder
 
     public function run(): void
     {
-        foreach (self::PERMISSIONS as $group => $items) {
+        $this->seedPermissions(self::PERMISSIONS, 'web');
+        $this->seedPermissions(self::PORTAL_PERMISSIONS, CustomerUser::GUARD);
+
+        $this->seedRoles(self::ROLES, 'web');
+        $this->seedRoles(self::PORTAL_ROLES, CustomerUser::GUARD);
+    }
+
+    /**
+     * @param  array<string, array<string, string>>  $groups
+     */
+    private function seedPermissions(array $groups, string $guard): void
+    {
+        foreach ($groups as $group => $items) {
             foreach ($items as $slug => $name) {
                 Permission::updateOrCreate(
                     ['slug' => $slug],
-                    ['name' => $name, 'group' => $group],
+                    ['name' => $name, 'group' => $group, 'guard' => $guard],
                 );
             }
         }
+    }
 
-        foreach (self::ROLES as $slug => $definition) {
+    /**
+     * @param  array<string, array{name:string, description:string, permissions:array<int, string>}>  $roles
+     */
+    private function seedRoles(array $roles, string $guard): void
+    {
+        foreach ($roles as $slug => $definition) {
             $role = Role::updateOrCreate(
                 ['slug' => $slug],
                 [
                     'name' => $definition['name'],
                     'description' => $definition['description'],
+                    'guard' => $guard,
                     'is_system' => true,
                 ],
             );
 
+            // Dibatasi guard yang sama: kalau tidak, salah tulis satu slug di
+            // daftar di atas bisa menyelipkan permission staf ke role portal
+            // tanpa ada yang menahannya.
             $role->permissions()->sync(
-                Permission::whereIn('slug', $definition['permissions'])->pluck('id'),
+                Permission::forGuard($guard)
+                    ->whereIn('slug', $definition['permissions'])
+                    ->pluck('id'),
             );
         }
     }

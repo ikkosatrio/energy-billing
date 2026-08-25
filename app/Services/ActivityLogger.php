@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ActivityLog;
+use App\Models\CustomerUser;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -20,7 +21,7 @@ class ActivityLogger
     ): void {
         try {
             ActivityLog::create([
-                'user_id' => auth()->id(),
+                ...self::actor(),
                 'action' => $action,
                 'model_type' => $model ? $model::class : null,
                 'model_id' => $model?->getKey(),
@@ -33,6 +34,24 @@ class ActivityLogger
         } catch (\Throwable $e) {
             report($e);
         }
+    }
+
+    /**
+     * Pelaku aksi, dipetakan ke kolom yang benar sesuai guard-nya.
+     *
+     * `activity_logs.user_id` adalah foreign key ke tabel staf, jadi id akun
+     * portal TIDAK boleh masuk ke sana — auth()->id() saja akan mengirim id
+     * yang salah tabel begitu request datang dari portal.
+     *
+     * @return array{user_id:?int, customer_user_id:?int}
+     */
+    private static function actor(): array
+    {
+        if ($portal = auth()->guard(CustomerUser::GUARD)->user()) {
+            return ['user_id' => null, 'customer_user_id' => $portal->getKey()];
+        }
+
+        return ['user_id' => auth()->guard('web')->id(), 'customer_user_id' => null];
     }
 
     /**
