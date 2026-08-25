@@ -40,6 +40,16 @@ class SettingPage extends Component
             'values.app_name' => ['required', 'string', 'max:100'],
             'values.company_name' => ['required', 'string', 'max:255'],
             'values.company_email' => ['nullable', 'email:filter', 'max:255'],
+            /*
+             * Empat identitas di bawah ini tercetak di kop invoice dan
+             * kuitansi. Sebelumnya tidak punya aturan sama sekali — tersimpan
+             * apa adanya, berapa pun panjangnya, dan kop dokumen yang
+             * dikirim ke pelanggan ikut melebar tanpa ada yang menahan.
+             */
+            'values.company_address' => ['nullable', 'string', 'max:500'],
+            'values.company_phone' => ['nullable', 'string', 'max:50'],
+            'values.company_npwp' => ['nullable', 'string', 'max:50'],
+            'values.company_domain' => ['nullable', 'string', 'max:255'],
 
             'values.billing_cut_off_day' => ['required', 'integer', 'between:1,28'],
             'values.billing_generate_time' => ['required', 'date_format:H:i'],
@@ -77,6 +87,10 @@ class SettingPage extends Component
         return [
             'values.app_name' => 'nama aplikasi',
             'values.company_name' => 'nama perusahaan',
+            'values.company_address' => 'alamat perusahaan',
+            'values.company_phone' => 'telepon perusahaan',
+            'values.company_npwp' => 'NPWP perusahaan',
+            'values.company_domain' => 'domain perusahaan',
             'values.billing_cut_off_day' => 'tanggal generate invoice',
             'values.billing_generate_time' => 'jam generate',
             'values.invoice_due_days' => 'jatuh tempo',
