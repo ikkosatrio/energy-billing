@@ -84,6 +84,73 @@ class ReceiptTest extends TestCase
         ]);
     }
 
+    // ── Penerbitan otomatis ──────────────────────────────────────────────
+
+    public function test_default_pembayaran_belum_punya_nomor_kuitansi(): void
+    {
+        $payment = $this->pay($this->invoice(), 500_000);
+
+        $this->assertNull($payment->fresh()->receipt_no);
+    }
+
+    public function test_auto_issue_memberi_nomor_saat_pembayaran_dicatat(): void
+    {
+        $this->setting('receipt_auto_issue', true);
+
+        $payment = $this->pay($this->invoice(), 500_000)->fresh();
+
+        $this->assertNotNull($payment->receipt_no);
+        $this->assertNotNull($payment->receipt_issued_at);
+        // Angkanya di-snapshot saat terbit, sama seperti jalur manual.
+        $this->assertEquals(500_000, $payment->receipt_paid_total);
+        $this->assertEquals(500_000, $payment->receipt_outstanding_after);
+        // Terbit bukan berarti terkirim.
+        $this->assertNull($payment->receipt_sent_at);
+        Mail::assertNothingQueued();
+    }
+
+    public function test_auto_issue_berlaku_untuk_pembayaran_dari_form(): void
+    {
+        $this->setting('receipt_auto_issue', true);
+        $invoice = $this->invoice();
+
+        Livewire::test(PaymentPage::class)
+            ->call('create', $invoice->id)
+            ->set('form.payment_date', '2026-08-15')
+            ->set('form.amount', 250_000)
+            ->set('form.method', 'transfer')
+            ->call('save');
+
+        $this->assertNotNull(InvoicePayment::firstOrFail()->receipt_no);
+    }
+
+    /**
+     * Invoice batal tetap boleh punya riwayat pembayaran, tapi nomor kuitansi
+     * tidak boleh terpakai untuk dokumen yang tidak boleh dikirim ke siapa pun.
+     */
+    public function test_auto_issue_melewati_invoice_yang_dibatalkan(): void
+    {
+        $this->setting('receipt_auto_issue', true);
+        $invoice = $this->invoice();
+        $invoice->forceFill(['status' => 'cancelled'])->save();
+
+        $payment = $this->pay($invoice, 500_000)->fresh();
+
+        $this->assertNull($payment->receipt_no);
+    }
+
+    public function test_auto_issue_tidak_menggandakan_nomor_saat_pembayaran_diubah(): void
+    {
+        $this->setting('receipt_auto_issue', true);
+
+        $payment = $this->pay($this->invoice(), 500_000)->fresh();
+        $nomorAwal = $payment->receipt_no;
+
+        $payment->forceFill(['amount' => 600_000])->save();
+
+        $this->assertSame($nomorAwal, $payment->fresh()->receipt_no);
+    }
+
     // ── Penomoran ────────────────────────────────────────────────────────
 
     public function test_nomor_kuitansi_mengikuti_format_setting_dan_berurutan(): void

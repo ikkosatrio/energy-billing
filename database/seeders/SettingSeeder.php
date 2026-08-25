@@ -51,6 +51,10 @@ class SettingSeeder extends Seeder
 
         // --- Kuitansi ---
         ['receipt_number_format', 'KW/{YYYY}/{MM}/{SEQ}', 'string', 'billing', 'Format Nomor Kuitansi'],
+        // Default mati: nomor kuitansi baru diberikan saat dokumennya pertama
+        // kali dibuka atau dikirim. Dinyalakan bila penomoran harus urut
+        // mengikuti waktu pembayaran diterima, bukan waktu dokumennya dibuka.
+        ['receipt_auto_issue', '0', 'boolean', 'billing', 'Terbitkan Kuitansi Otomatis'],
         // Default mati: kuitansi baru terkirim bila operator menekan tombolnya.
         ['receipt_auto_send', '0', 'boolean', 'billing', 'Kirim Kuitansi Otomatis'],
         // Masa tunggu sebelum kuitansi dikirim otomatis. Bukan basa-basi:

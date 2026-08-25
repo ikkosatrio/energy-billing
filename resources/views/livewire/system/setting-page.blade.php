@@ -198,12 +198,23 @@
                         </div>
 
                         <label class="checkbox-row" style="margin-top:12px">
+                            <input type="checkbox" wire:model.live="values.receipt_auto_issue">
+                            <span>Terbitkan kuitansi otomatis saat pembayaran dicatat</span>
+                        </label>
+                        <div class="card-sub" style="margin-left:23px">
+                            Tanpa ini, nomor kuitansi baru diberikan saat dokumennya pertama kali
+                            dibuka atau dikirim — jadi urutan nomornya mengikuti kapan dokumen
+                            diakses, bukan kapan uangnya diterima.
+                        </div>
+
+                        <label class="checkbox-row" style="margin-top:12px">
                             <input type="checkbox" wire:model.live="values.receipt_auto_send">
                             <span>Kirim kuitansi otomatis ke pelanggan</span>
                         </label>
                         <div class="card-sub" style="margin-left:23px">
                             Tanpa ini, kuitansi hanya terkirim bila operator menekan tombol Kirim
-                            di halaman Pembayaran.
+                            di halaman Pembayaran. Berdiri sendiri dari penerbitan otomatis di
+                            atas: pengiriman selalu memberi nomor lebih dulu bila belum ada.
                         </div>
 
                         @if ($values['receipt_auto_send'] ?? false)

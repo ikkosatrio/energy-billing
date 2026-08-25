@@ -53,6 +53,7 @@ class SettingPage extends Component
             'values.invoice_auto_issue' => ['boolean'],
             'values.invoice_auto_send' => ['boolean'],
             'values.receipt_number_format' => ['required', 'string', 'max:100'],
+            'values.receipt_auto_issue' => ['boolean'],
             'values.receipt_auto_send' => ['boolean'],
             'values.receipt_auto_send_days' => ['required', 'integer', 'between:0,30'],
 

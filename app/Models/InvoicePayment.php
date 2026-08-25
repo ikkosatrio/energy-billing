@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Billing\ReceiptService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -43,6 +44,34 @@ class InvoicePayment extends Model
 
         static::saved($refresh);
         static::deleted($refresh);
+
+        /*
+         * Penomoran kuitansi otomatis, bila receipt_auto_issue dinyalakan.
+         *
+         * Dipasang sebagai event model, bukan dipanggil di tiap tempat
+         * pembayaran dibuat: ada empat jalur pembuatan (form Pembayaran,
+         * input cepat, impor mutasi, dan batch), dan yang terlewat tidak
+         * memunculkan error — hanya kuitansi yang nomornya melompat, dan itu
+         * baru ketahuan setelah dokumennya beredar.
+         *
+         * Invoice yang batal dilewati: pembayarannya masih tercatat sebagai
+         * riwayat, tapi menerbitkan tanda terima atas tagihan yang sudah tidak
+         * berlaku hanya membuat nomor kuitansi terpakai untuk dokumen yang
+         * tidak boleh dikirim ke siapa pun.
+         */
+        static::created(function (InvoicePayment $payment) {
+            if (!setting('receipt_auto_issue', false)) {
+                return;
+            }
+
+            $invoice = $payment->invoice;
+
+            if (!$invoice || $invoice->isCancelled()) {
+                return;
+            }
+
+            app(ReceiptService::class)->issue($payment);
+        });
     }
 
     public function invoice(): BelongsTo
