@@ -40,6 +40,13 @@ class MeterResetTest extends TestCase
         $this->seed(SettingSeeder::class);
     }
 
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+
+        parent::tearDown();
+    }
+
     private function meterWithReset(): PowerMeter
     {
         $meter = PowerMeter::create([
@@ -130,6 +137,15 @@ class MeterResetTest extends TestCase
         $meter = PowerMeter::create([
             'code' => 'MTR-RT', 'name' => 'Panel RT', 'multiplier' => 1, 'status' => 'active',
         ]);
+
+        /*
+         * Waktu dibekukan di tengah hari. Jendela "hari ini" di
+         * UsageSummaryService berhenti di now(), bukan di akhir hari, jadi
+         * dengan jam sungguhan keempat pembacaan di bawah ini jatuh di masa
+         * depan setiap kali suite dijalankan antara tengah malam dan jam 04:00
+         * — hasilnya 0 dan test gagal tanpa ada yang rusak.
+         */
+        Carbon::setTestNow('2026-07-10 12:00:00');
 
         $today = now()->startOfDay();
         MeterReading::insert([

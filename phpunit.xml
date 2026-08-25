@@ -18,6 +18,10 @@
         </include>
     </source>
     <php>
+        <!-- Suite lengkap sudah melewati 128 MB bawaan PHP, dan gejalanya
+             bukan test gagal melainkan proses mati di tengah jalan dengan
+             pesan yang tidak menyebut test mana pun. -->
+        <ini name="memory_limit" value="512M"/>
         <env name="APP_ENV" value="testing"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_DRIVER" value="array"/>
