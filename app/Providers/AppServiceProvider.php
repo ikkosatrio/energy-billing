@@ -30,6 +30,12 @@ class AppServiceProvider extends ServiceProvider
         // Paginator bawaan memakai markup Tailwind yang mengandalkan preflight
         // (dimatikan di project ini). resources/views/vendor/pagination/default
         // memakai kelas design system sendiri.
+        //
+        // Baris ini hanya berlaku untuk paginator di luar Livewire: trait
+        // WithPagination menimpa defaultView di tiap boot komponen. Tabel
+        // berpaginasi di dalam komponen dilayani
+        // resources/views/vendor/livewire/tailwind.blade.php — lihat catatan
+        // di file itu.
         Paginator::defaultView('vendor.pagination.default');
     }
 }
