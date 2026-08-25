@@ -72,7 +72,7 @@
                                     <span class="badge badge-danger" style="margin-left:6px">Lewat</span>
                                 @endif
                             </td>
-                            <td class="num">{{ kwh($invoice->total_kwh, 1) }}</td>
+                            <td class="num">{{ kwh($invoice->total_kwh) }}</td>
                             <td class="num strong">{{ rupiah($invoice->total_amount, false) }}</td>
                             <td class="num {{ $invoice->outstanding > 0 ? '' : 'text-muted' }}"
                                 @if ($invoice->outstanding > 0) style="color:var(--danger);font-weight:600" @endif>

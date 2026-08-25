@@ -58,45 +58,18 @@ if (!function_exists('rupiah')) {
 
 if (!function_exists('kwh')) {
     /**
-     * Format angka kWh / stand meter dengan pemisah ribuan Indonesia.
+     * Format angka teknis — kWh, stand meter, kW, kVA, tegangan, arus —
+     * dengan pemisah ribuan Indonesia.
+     *
+     * Dua desimal adalah defaultnya, dan sengaja tidak ada pemanggil yang
+     * menurunkannya. Kolom-kolomnya disimpan decimal:2, jadi membulatkan ke
+     * bilangan bulat di lapisan tampilan membuat angka di layar tidak lagi
+     * cocok dengan yang ditagihkan invoice: selisih 0,4 kWh per baris tidak
+     * terlihat satu per satu, tapi totalnya tidak pernah sama.
      */
-    function kwh(int|float|string|null $value, int $decimals = 0): string
+    function kwh(int|float|string|null $value, int $decimals = 2): string
     {
         return number_format((float) $value, $decimals, ',', '.');
     }
 }
 
-if (!function_exists('kwh_short')) {
-    /**
-     * Bentuk ringkas untuk label di atas batang chart.
-     *
-     * Batang pada chart harian bisa tinggal ~28px lebarnya, sementara angka
-     * kWh sehari kerap lima digit. Ditulis penuh, label bertabrakan dengan
-     * tetangganya dan justru tidak terbaca sama sekali. Angka persisnya tetap
-     * tersedia di tooltip tiap batang.
-     */
-    function kwh_short(int|float|string|null $value): string
-    {
-        $number = (float) $value;
-        // Dibulatkan dulu sebelum dibandingkan: 999,6 ditulis penuh akan
-        // menjadi "1.000" yang rancu dengan pemisah ribuan, padahal maksudnya
-        // seribu — lebih jelas dibaca sebagai "1,0rb".
-        $abs = round(abs($number));
-
-        if ($abs < 1_000) {
-            return number_format($number, 0, ',', '.');
-        }
-
-        if ($abs < 1_000_000) {
-            // Satu desimal hanya di bawah 100 rb — di atas itu tidak menambah
-            // informasi apa pun dan hanya memanjangkan label. Perbandingannya
-            // memakai nilai yang sudah dibulatkan ke satu desimal, supaya
-            // 99.950 tidak lolos sebagai "100,0rb".
-            $thousands = $number / 1_000;
-
-            return number_format($thousands, round(abs($thousands), 1) < 100 ? 1 : 0, ',', '.').'rb';
-        }
-
-        return number_format($number / 1_000_000, 1, ',', '.').'jt';
-    }
-}

@@ -62,9 +62,7 @@
         </div>
     @else
         @php
-            // Desimal hanya berguna selama angkanya kecil; pada puluhan ribu kWh
-            // satu digit di belakang koma cuma memanjangkan angka di kartu sempit.
-            $fmtKwh = fn (float $value) => kwh($value, $value < 1000 ? 1 : 0);
+            $fmtKwh = fn (float $value) => kwh($value);
         @endphp
         <div class="device-grid-widget">
             @foreach ($meters as $index => $meter)
@@ -94,7 +92,7 @@
 
                     <div class="device-tile-power">
                         <span class="device-tile-kw">
-                            {{ $live?->active_power_kw !== null ? kwh($live->active_power_kw, 1) : '—' }}<small>kW</small>
+                            {{ $live?->active_power_kw !== null ? kwh($live->active_power_kw) : '—' }}<small>kW</small>
                         </span>
                         <span class="device-tile-pf">
                             PF {{ $live?->power_factor !== null ? number_format($live->power_factor, 2, ',', '.') : '—' }}
@@ -105,8 +103,8 @@
                         @foreach ($lines as $key => $label)
                             <div class="device-tile-phase-row">
                                 <b>{{ $label }}</b>
-                                <span>{{ $live?->{'voltage_'.$key} !== null ? kwh($live->{'voltage_'.$key}, 0).'V' : '—' }}</span>
-                                <span>{{ $live?->{'current_'.$key} !== null ? kwh($live->{'current_'.$key}, 1).'A' : '—' }}</span>
+                                <span>{{ $live?->{'voltage_'.$key} !== null ? kwh($live->{'voltage_'.$key}).'V' : '—' }}</span>
+                                <span>{{ $live?->{'current_'.$key} !== null ? kwh($live->{'current_'.$key}).'A' : '—' }}</span>
                             </div>
                         @endforeach
                     </div>

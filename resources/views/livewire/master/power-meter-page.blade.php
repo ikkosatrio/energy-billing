@@ -91,10 +91,10 @@
                                 @if ($reading)
                                     <div class="stand-split">
                                         <span class="stand-split-item">
-                                            <span class="legend-swatch lwbp"></span>LWBP {{ kwh($reading->stand_lwbp, 1) }}
+                                            <span class="legend-swatch lwbp"></span>LWBP {{ kwh($reading->stand_lwbp) }}
                                         </span>
                                         <span class="stand-split-item">
-                                            <span class="legend-swatch wbp"></span>WBP {{ kwh($reading->stand_wbp, 1) }}
+                                            <span class="legend-swatch wbp"></span>WBP {{ kwh($reading->stand_wbp) }}
                                         </span>
                                     </div>
                                     <div class="sub">kWh · {{ $reading->read_at->translatedFormat('d M H:i') }}</div>

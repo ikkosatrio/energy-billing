@@ -58,10 +58,10 @@
                             </td>
                             <td class="num text-muted" style="text-align:left">{{ $row['meter'] ?? '—' }}</td>
                             <td>{{ $row['tariff_group'] ?? '—' }}</td>
-                            <td class="num">{{ kwh($row['lwbp'], 1) }}</td>
-                            <td class="num">{{ kwh($row['wbp'], 1) }}</td>
-                            <td class="num strong">{{ kwh($row['total_kwh'], 1) }}</td>
-                            <td class="num">{{ $row['peak_kw'] !== null ? kwh($row['peak_kw'], 1).' kW' : '—' }}</td>
+                            <td class="num">{{ kwh($row['lwbp']) }}</td>
+                            <td class="num">{{ kwh($row['wbp']) }}</td>
+                            <td class="num strong">{{ kwh($row['total_kwh']) }}</td>
+                            <td class="num">{{ $row['peak_kw'] !== null ? kwh($row['peak_kw']).' kW' : '—' }}</td>
                             <td class="num strong">{{ rupiah($row['billed']) }}</td>
                         </tr>
                     @empty
@@ -77,9 +77,9 @@
                     <tfoot>
                         <tr style="background:var(--bg-subtle);font-weight:700">
                             <td colspan="3">Total</td>
-                            <td class="num">{{ kwh($totals['lwbp'], 1) }}</td>
-                            <td class="num">{{ kwh($totals['wbp'], 1) }}</td>
-                            <td class="num">{{ kwh($totals['total_kwh'], 1) }}</td>
+                            <td class="num">{{ kwh($totals['lwbp']) }}</td>
+                            <td class="num">{{ kwh($totals['wbp']) }}</td>
+                            <td class="num">{{ kwh($totals['total_kwh']) }}</td>
                             <td></td>
                             <td class="num">{{ rupiah($totals['billed']) }}</td>
                         </tr>

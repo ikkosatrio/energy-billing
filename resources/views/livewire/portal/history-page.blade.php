@@ -58,10 +58,10 @@
             <div class="bar-chart">
                 @foreach ($hourly as $slot)
                     @php $total = $slot['lwbp'] + $slot['wbp']; @endphp
-                    <div class="bar-col" title="{{ sprintf('%02d:00', $slot['hour']) }} — {{ kwh($total, 1) }} kWh">
+                    <div class="bar-col" title="{{ sprintf('%02d:00', $slot['hour']) }} — {{ kwh($total) }} kWh">
                         <div class="bar-stack">
                             @if ($total > 0)
-                                <div class="bar-value">{{ kwh_short($total) }}</div>
+                                <div class="bar-value">{{ kwh($total) }}</div>
                             @endif
                             <div class="bar wbp" style="height:{{ $slot['wbp'] / $hourlyMax * 100 }}%"></div>
                             <div class="bar lwbp" style="height:{{ $slot['lwbp'] / $hourlyMax * 100 }}%"></div>
@@ -90,10 +90,10 @@
             @else
                 <div class="bar-chart" style="height:200px">
                     @foreach ($dailies as $daily)
-                        <div class="bar-col" title="{{ $daily->date->translatedFormat('d M') }} — {{ kwh($daily->total_kwh, 1) }} kWh">
+                        <div class="bar-col" title="{{ $daily->date->translatedFormat('d M') }} — {{ kwh($daily->total_kwh) }} kWh">
                             <div class="bar-stack">
                                 @if ($daily->total_kwh > 0)
-                                    <div class="bar-value">{{ kwh_short($daily->total_kwh) }}</div>
+                                    <div class="bar-value">{{ kwh($daily->total_kwh) }}</div>
                                 @endif
                                 <div class="bar wbp" style="height:{{ $daily->kwh_wbp / $dailyMax * 100 }}%"></div>
                                 <div class="bar lwbp" style="height:{{ $daily->kwh_lwbp / $dailyMax * 100 }}%"></div>
@@ -119,18 +119,18 @@
                             @foreach ($dailies as $daily)
                                 <tr>
                                     <td class="mono">{{ $daily->date->translatedFormat('d M Y (D)') }}</td>
-                                    <td class="num">{{ kwh($daily->kwh_lwbp, 1) }}</td>
-                                    <td class="num">{{ kwh($daily->kwh_wbp, 1) }}</td>
-                                    <td class="num strong">{{ kwh($daily->total_kwh, 1) }}</td>
+                                    <td class="num">{{ kwh($daily->kwh_lwbp) }}</td>
+                                    <td class="num">{{ kwh($daily->kwh_wbp) }}</td>
+                                    <td class="num strong">{{ kwh($daily->total_kwh) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
                         <tfoot>
                             <tr style="background:var(--bg-subtle);font-weight:700">
                                 <td>Total {{ $monthStart->translatedFormat('F') }}</td>
-                                <td class="num">{{ kwh($summary['lwbp'], 1) }}</td>
-                                <td class="num">{{ kwh($summary['wbp'], 1) }}</td>
-                                <td class="num">{{ kwh($summary['total'], 1) }}</td>
+                                <td class="num">{{ kwh($summary['lwbp']) }}</td>
+                                <td class="num">{{ kwh($summary['wbp']) }}</td>
+                                <td class="num">{{ kwh($summary['total']) }}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -146,10 +146,10 @@
 
                 <div class="bar-chart" style="height:180px;gap:8px">
                     @foreach ($monthly as $entry)
-                        <div class="bar-col" title="{{ $entry['label'] }} — {{ kwh($entry['total'], 1) }} kWh">
+                        <div class="bar-col" title="{{ $entry['label'] }} — {{ kwh($entry['total']) }} kWh">
                             <div class="bar-stack">
                                 @if ($entry['total'] > 0)
-                                    <div class="bar-value">{{ kwh_short($entry['total']) }}</div>
+                                    <div class="bar-value">{{ kwh($entry['total']) }}</div>
                                 @endif
                                 <div class="bar primary" style="height:{{ $entry['total'] / $monthMax * 100 }}%"></div>
                             </div>
@@ -165,25 +165,25 @@
 
                 <div class="kv-row">
                     <span class="kv-label">Total kWh {{ $monthStart->translatedFormat('F') }}</span>
-                    <span class="kv-value">{{ kwh($summary['total'], 1) }}</span>
+                    <span class="kv-value">{{ kwh($summary['total']) }}</span>
                 </div>
                 <div class="kv-row">
                     <span class="kv-label">LWBP</span>
-                    <span class="kv-value">{{ kwh($summary['lwbp'], 1) }} kWh</span>
+                    <span class="kv-value">{{ kwh($summary['lwbp']) }} kWh</span>
                 </div>
                 <div class="kv-row">
                     <span class="kv-label">WBP</span>
-                    <span class="kv-value">{{ kwh($summary['wbp'], 1) }} kWh</span>
+                    <span class="kv-value">{{ kwh($summary['wbp']) }} kWh</span>
                 </div>
                 <div class="kv-row">
                     <span class="kv-label">Rata-rata harian</span>
-                    <span class="kv-value">{{ kwh($summary['daily_average'], 1) }} kWh</span>
+                    <span class="kv-value">{{ kwh($summary['daily_average']) }} kWh</span>
                 </div>
                 <div class="kv-row">
                     <span class="kv-label">Beban puncak</span>
                     <span class="kv-value">
                         @if ($summary['peak_kw'])
-                            {{ kwh($summary['peak_kw'], 1) }} kW
+                            {{ kwh($summary['peak_kw']) }} kW
                             <span class="text-faint" style="font-weight:500">
                                 · {{ $summary['peak_at']?->translatedFormat('d M H:i') }}
                             </span>

@@ -59,7 +59,7 @@
         @php
             // Desimal hanya berguna selama angkanya kecil; pada puluhan ribu kWh
             // satu digit di belakang koma cuma memanjangkan baris.
-            $fmtKwh = fn (float $value) => kwh($value, $value < 1000 ? 1 : 0);
+            $fmtKwh = fn (float $value) => kwh($value);
         @endphp
         <div class="meter-grid">
             @foreach ($meters as $index => $meter)
@@ -127,10 +127,10 @@
                                 <div class="phase-row">
                                     <span class="phase-tag">{{ $label }}</span>
                                     <span class="mono">
-                                        {{ $live?->{'voltage_'.$key} !== null ? kwh($live->{'voltage_'.$key}, 1).' V' : '—' }}
+                                        {{ $live?->{'voltage_'.$key} !== null ? kwh($live->{'voltage_'.$key}).' V' : '—' }}
                                     </span>
                                     <span class="mono">
-                                        {{ $live?->{'current_'.$key} !== null ? kwh($live->{'current_'.$key}, 1).' A' : '—' }}
+                                        {{ $live?->{'current_'.$key} !== null ? kwh($live->{'current_'.$key}).' A' : '—' }}
                                     </span>
                                 </div>
                             @endforeach
@@ -178,7 +178,7 @@
                             <div class="day-chart" role="img"
                                  aria-label="Pemakaian harian {{ $sum['span_label'] }}, tertinggi {{ $fmtKwh($sum['peak']['kwh']) }} kWh pada {{ $sum['peak']['date']->translatedFormat('j F') }}">
                                 @foreach ($sum['days'] as $day)
-                                    <div class="day-bar-slot" title="{{ $day['date']->translatedFormat('D, j M') }} — {{ kwh($day['kwh'], 1) }} kWh">
+                                    <div class="day-bar-slot" title="{{ $day['date']->translatedFormat('D, j M') }} — {{ kwh($day['kwh']) }} kWh">
                                         <div class="day-bar {{ $day['is_peak'] ? 'is-peak' : '' }} {{ $day['is_today'] ? 'is-today' : '' }}"
                                              style="height:{{ max(2, round($day['kwh'] / $sum['max_kwh'] * 100)) }}%"></div>
                                     </div>

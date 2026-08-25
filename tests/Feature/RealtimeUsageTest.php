@@ -338,8 +338,11 @@ class RealtimeUsageTest extends TestCase
         Livewire::test(RealtimePage::class)
             ->assertSee('Stand LWBP')
             ->assertSee('Stand WBP')
-            ->assertSee('1.270.281')
-            ->assertSee('414.260')
+            // Dua desimal, bukan dibulatkan: stand disimpan decimal:2, dan
+            // 1.270.280,5 yang ditulis "1.270.281" membuat angka di layar
+            // tidak lagi cocok dengan yang dipakai menghitung tagihan.
+            ->assertSee('1.270.280,50')
+            ->assertSee('414.260,20')
             ->assertDontSee('Power Factor');
     }
 

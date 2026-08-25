@@ -73,15 +73,15 @@
                             </td>
                             <td class="num">
                                 <span class="stand-split-item" style="justify-content:flex-end">
-                                    <span class="legend-swatch lwbp"></span>{{ kwh($usage['lwbp'], 1) }}
+                                    <span class="legend-swatch lwbp"></span>{{ kwh($usage['lwbp']) }}
                                 </span>
                             </td>
                             <td class="num">
                                 <span class="stand-split-item" style="justify-content:flex-end">
-                                    <span class="legend-swatch wbp"></span>{{ kwh($usage['wbp'], 1) }}
+                                    <span class="legend-swatch wbp"></span>{{ kwh($usage['wbp']) }}
                                 </span>
                             </td>
-                            <td class="num strong">{{ kwh($usage['lwbp'] + $usage['wbp'], 1) }}</td>
+                            <td class="num strong">{{ kwh($usage['lwbp'] + $usage['wbp']) }}</td>
                             {{-- Dua register terpisah, bukan dijumlahkan — LWBP dan WBP
                                  adalah akumulator independen di meter, menjumlahkannya jadi
                                  satu "stand total" tidak berarti apa-apa secara fisik. --}}

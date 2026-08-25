@@ -35,12 +35,18 @@
     <tbody>
       @forelse ($rows as $row)
         <tr>
-          @foreach ((array) $row as $value)
+          {{--
+            Format angka ditentukan dari judul kolomnya: kolom bertanda (Rp)
+            adalah nominal dan dibulatkan ke rupiah penuh, sisanya angka
+            teknis — kWh, stand, kW, tegangan, arus — yang ditulis dua
+            desimal supaya cocok dengan yang tampil di layar dan di invoice.
+          --}}
+          @foreach (array_values((array) $row) as $i => $value)
             <td>
               @if ($value instanceof \Illuminate\Support\Carbon)
                 {{ $value->translatedFormat('d M Y') }}
               @elseif (is_float($value) || is_int($value))
-                {{ number_format((float) $value, 0, ',', '.') }}
+                {{ str_contains($headings[$i] ?? '', '(Rp)') ? rupiah($value, false) : kwh($value) }}
               @else
                 {{ $value ?? '—' }}
               @endif

@@ -71,16 +71,16 @@
             <div class="card">
                 <div class="stat-label">Selisih Stand</div>
                 <div class="stat-value sm" style="margin-top:8px">
-                    {{ kwh($summary['kwh_lwbp'] + $summary['kwh_wbp'], 1) }} <small>kWh</small>
+                    {{ kwh($summary['kwh_lwbp'] + $summary['kwh_wbp']) }} <small>kWh</small>
                 </div>
                 <div class="stat-split">
                     <span class="stat-split-item">
                         <span class="legend-swatch lwbp"></span>
-                        LWBP <strong>{{ kwh($summary['kwh_lwbp'], 1) }}</strong>
+                        LWBP <strong>{{ kwh($summary['kwh_lwbp']) }}</strong>
                     </span>
                     <span class="stat-split-item">
                         <span class="legend-swatch wbp"></span>
-                        WBP <strong>{{ kwh($summary['kwh_wbp'], 1) }}</strong>
+                        WBP <strong>{{ kwh($summary['kwh_wbp']) }}</strong>
                     </span>
                 </div>
             </div>
@@ -178,22 +178,22 @@
                             @php $r = $row['reading']; @endphp
                             <tr @if ($row['is_anomaly']) style="background:var(--danger-bg)" @endif>
                                 <td class="mono nowrap">{{ $r->read_at->translatedFormat('d M Y H:i:s') }}</td>
-                                <td class="num">{{ kwh($r->stand_lwbp, 2) }}</td>
+                                <td class="num">{{ kwh($r->stand_lwbp) }}</td>
                                 <td class="num {{ ($row['delta_lwbp'] ?? 0) < 0 ? '' : 'text-muted' }}"
                                     @if (($row['delta_lwbp'] ?? 0) < 0) style="color:var(--danger);font-weight:600" @endif>
-                                    {{ $row['delta_lwbp'] === null ? '—' : kwh($row['delta_lwbp'], 2) }}
+                                    {{ $row['delta_lwbp'] === null ? '—' : kwh($row['delta_lwbp']) }}
                                 </td>
-                                <td class="num">{{ kwh($r->stand_wbp, 2) }}</td>
+                                <td class="num">{{ kwh($r->stand_wbp) }}</td>
                                 <td class="num {{ ($row['delta_wbp'] ?? 0) < 0 ? '' : 'text-muted' }}"
                                     @if (($row['delta_wbp'] ?? 0) < 0) style="color:var(--danger);font-weight:600" @endif>
-                                    {{ $row['delta_wbp'] === null ? '—' : kwh($row['delta_wbp'], 2) }}
+                                    {{ $row['delta_wbp'] === null ? '—' : kwh($row['delta_wbp']) }}
                                 </td>
-                                <td class="num">{{ $r->active_power_kw !== null ? kwh($r->active_power_kw, 1) : '—' }}</td>
+                                <td class="num">{{ $r->active_power_kw !== null ? kwh($r->active_power_kw) : '—' }}</td>
                                 @foreach ($lines as $key => $label)
-                                    <td class="num">{{ $r->{'voltage_'.$key} !== null ? kwh($r->{'voltage_'.$key}, 1) : '—' }}</td>
+                                    <td class="num">{{ $r->{'voltage_'.$key} !== null ? kwh($r->{'voltage_'.$key}) : '—' }}</td>
                                 @endforeach
                                 @foreach ($lines as $key => $label)
-                                    <td class="num">{{ $r->{'current_'.$key} !== null ? kwh($r->{'current_'.$key}, 1) : '—' }}</td>
+                                    <td class="num">{{ $r->{'current_'.$key} !== null ? kwh($r->{'current_'.$key}) : '—' }}</td>
                                 @endforeach
                                 <td class="num">{{ $r->power_factor !== null ? number_format($r->power_factor, 2, ',', '.') : '—' }}</td>
                                 <td>
