@@ -260,26 +260,6 @@ a:hover { color: var(--primary-dark); }
 }
 .sidebar-sublink.active .sidebar-dot { background: #3b82f6; }
 
-/* Kartu status gateway di kaki sidebar */
-.sidebar-status {
-  margin: 0 12px 12px;
-  padding: 13px 14px;
-  border-radius: var(--radius);
-  background: rgba(255, 255, 255, .04);
-  border: 1px solid rgba(255, 255, 255, .06);
-}
-.sidebar-status-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--sidebar-text);
-  letter-spacing: .06em;
-}
-.sidebar-status-body { font-size: 12px; color: #cbd5e1; margin-top: 7px; line-height: 1.5; }
-.sidebar-status-body span { color: var(--text-muted); }
-
 .sidebar-user {
   padding: 14px 18px;
   border-top: 1px solid rgba(255, 255, 255, .07);

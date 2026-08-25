@@ -22,6 +22,9 @@ import { mkdir } from 'node:fs/promises';
 const BASE = process.env.GUIDE_BASE_URL ?? 'http://127.0.0.1:8123';
 const USER = process.env.GUIDE_USER ?? 'admin';
 const PASS = process.env.GUIDE_PASS ?? 'password';
+/* Akun Portal Pelanggan dari DemoDataSeeder — dipakai memotret Bagian 4. */
+const PORTAL_USER = process.env.GUIDE_PORTAL_USER ?? 'mitragroup';
+const PORTAL_PASS = process.env.GUIDE_PORTAL_PASS ?? 'password';
 const OUT = 'resources/guide/screenshots';
 
 /** Lebar viewport dipilih supaya sidebar + tabel muat tanpa scroll mendatar. */
@@ -91,8 +94,25 @@ const SHOTS = [
   { name: 'settings', path: '/system/settings' },
   { name: 'users', path: '/system/users' },
   { name: 'roles', path: '/system/roles' },
+  { name: 'customer-users', path: '/system/customer-users' },
   { name: 'activity-logs', path: '/system/activity-logs' },
   { name: 'trial-data', path: '/system/trial-data' },
+];
+
+/**
+ * Halaman Portal Pelanggan.
+ *
+ * Dipotret dengan sesi login sendiri: guard portal terpisah dari guard staf,
+ * jadi sesi admin di atas tidak bisa membuka halaman-halaman ini.
+ */
+const PORTAL_SHOTS = [
+  { name: 'portal-login', path: '/portal/login', noAuth: true },
+  { name: 'portal-dashboard', path: '/portal' },
+  { name: 'portal-monitoring', path: '/portal/monitoring' },
+  { name: 'portal-history', path: '/portal/riwayat' },
+  { name: 'portal-usage', path: '/portal/pemakaian' },
+  { name: 'portal-invoices', path: '/portal/invoice' },
+  { name: 'portal-payments', path: '/portal/pembayaran' },
 ];
 
 const browser = await chromium.launch();
@@ -143,5 +163,41 @@ for (const shot of SHOTS) {
   }
 }
 
+// ── Portal Pelanggan ───────────────────────────────────────────────────
+const portalContext = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1, locale: 'id-ID' });
+const portalPage = await portalContext.newPage();
+
+for (const shot of PORTAL_SHOTS) {
+  try {
+    if (shot.noAuth) {
+      // Halaman masuk hanya terlihat sebelum login, jadi dipotret lebih dulu
+      // — urutan di PORTAL_SHOTS memang menaruhnya paling awal.
+      await portalPage.goto(`${BASE}${shot.path}`, { waitUntil: 'networkidle' });
+      await portalPage.screenshot({ path: `${OUT}/${shot.name}.jpg`, type: 'jpeg', quality: 82 });
+      console.log(`  ✓ ${shot.name}`);
+      ok++;
+
+      // Sekalian masuk memakai form yang baru dipotret.
+      await portalPage.fill('input[name=username]', PORTAL_USER);
+      await portalPage.fill('input[name=password]', PORTAL_PASS);
+      await Promise.all([
+        portalPage.waitForURL('**/portal', { timeout: 15000 }),
+        portalPage.click('button[type=submit]'),
+      ]);
+      continue;
+    }
+
+    await portalPage.goto(`${BASE}${shot.path}`, { waitUntil: 'networkidle' });
+    await portalPage.waitForTimeout(900);
+    await portalPage.screenshot({ path: `${OUT}/${shot.name}.jpg`, type: 'jpeg', quality: 82 });
+    console.log(`  ✓ ${shot.name}`);
+    ok++;
+  } catch (e) {
+    console.log(`  ✗ ${shot.name} — ${e.message.split('\n')[0]}`);
+    gagal++;
+  }
+}
+
+await portalContext.close();
 await browser.close();
 console.log(`\nSelesai: ${ok} berhasil, ${gagal} gagal. Tersimpan di ${OUT}/`);

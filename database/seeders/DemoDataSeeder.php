@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\BillingPeriod;
 use App\Models\Customer;
+use App\Models\CustomerUser;
 use App\Models\Invoice;
 use App\Models\InvoicePayment;
 use App\Models\MeterReadingDaily;
@@ -11,6 +12,7 @@ use App\Models\MeterTariffSchedule;
 use App\Models\PaymentBatch;
 use App\Models\PowerMeter;
 use App\Models\PowerMeterStatus;
+use App\Models\Role;
 use App\Models\TariffGroup;
 use App\Models\User;
 use App\Services\Billing\InvoiceGenerator;
@@ -105,6 +107,8 @@ class DemoDataSeeder extends Seeder
         $this->applyScenarios();
         $this->createAgingInvoices();
         $this->closeOldestPeriod();
+
+        $this->createPortalAccounts();
 
         $this->report();
     }
@@ -844,6 +848,60 @@ class DemoDataSeeder extends Seeder
             ]);
     }
 
+    /**
+     * Akun Portal Pelanggan, satu per kondisi yang berbeda.
+     *
+     * Tanpa ini, /portal/login hidup tapi tidak ada satu pun akun untuk
+     * masuk — dan portal adalah bagian aplikasi yang paling perlu dicoba
+     * langsung, bukan dibayangkan. Pola daftarnya sama seperti SCENARIOS:
+     * bukan satu akun yang "kelihatan bagus", melainkan beberapa yang
+     * mewakili kondisi berbeda.
+     *
+     * Password diambil dari SEED_PORTAL_PASSWORD di .env; defaultnya sengaja
+     * lemah dan dicetak di ringkasan seeder, karena ini data contoh.
+     */
+    private function createPortalAccounts(): void
+    {
+        $password = env('SEED_PORTAL_PASSWORD', 'password');
+        $penuh = Role::where('slug', 'portal-penuh')->value('id');
+        $pantau = Role::where('slug', 'portal-pantau')->value('id');
+
+        $accounts = [
+            // Kasus normal: satu akun, satu pelanggan, akses penuh.
+            ['sinarabadi', 'Budi Santoso — PT Sinar Abadi Logistik', $penuh, true, ['C-001']],
+
+            /*
+             * Beberapa titik ukur pada satu akun, mis. satu grup usaha.
+             * Dua pelanggan ini dipilih karena keduanya punya invoice terbit
+             * DAN riwayat pembayaran — termasuk satu yang dicicil, sehingga
+             * portal memperlihatkan beberapa kuitansi untuk satu tagihan.
+             */
+            ['mitragroup', 'Ratna Wijaya — Mitra Group', $penuh, true, ['C-002', 'C-008']],
+
+            // Hanya memantau pemakaian: invoice dan nominal tagihan tidak
+            // pernah terlihat. Dipakai memeriksa penjagaan izin portal.
+            ['teknisikarya', 'Teknisi Gedung — PT Karya Pangan Sejahtera', $pantau, true, ['C-003']],
+
+            // Nonaktif: dipakai melihat penolakan saat mencoba masuk.
+            ['anugerahlama', 'Akun Lama — PT Anugerah Tekstil', $penuh, false, ['C-004']],
+        ];
+
+        foreach ($accounts as [$username, $name, $roleId, $active, $customerCodes]) {
+            $account = CustomerUser::create([
+                'name' => $name,
+                'username' => $username,
+                'email' => $username.'@pelanggan.example.com',
+                'password' => $password,
+                'role_id' => $roleId,
+                'is_active' => $active,
+            ]);
+
+            $account->customers()->sync(
+                Customer::whereIn('code', $customerCodes)->pluck('id')->all(),
+            );
+        }
+    }
+
     private function report(): void
     {
         $this->command?->info(sprintf(
@@ -859,5 +917,11 @@ class DemoDataSeeder extends Seeder
         $this->command?->line('  bolong & stand mundur, pelanggan tanpa email/meter/golongan,');
         $this->command?->line('  invoice draft→lunas→batal, cicilan, batch massal & impor, kuitansi');
         $this->command?->line('  terkirim & belum, tunggakan di seluruh bucket aging, periode tertutup.');
+
+        $this->command?->newLine();
+        $this->command?->info(sprintf('%d akun Portal Pelanggan dibuat.', CustomerUser::count()));
+        $this->command?->line('  sinarabadi (penuh, 1 pelanggan) · mitragroup (penuh, 2 pelanggan)');
+        $this->command?->line('  teknisikarya (pantau saja) · anugerahlama (nonaktif)');
+        $this->command?->warn('  Password semuanya: '.env('SEED_PORTAL_PASSWORD', 'password').' — ganti bila dipakai di luar uji coba.');
     }
 }

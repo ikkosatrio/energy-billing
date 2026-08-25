@@ -112,7 +112,7 @@
     Kalau kamu benar-benar baru, baca Bagian 1 dan 2 dulu — cuma beberapa
     halaman, tapi setelah itu semua menu terasa masuk akal. Kalau kamu sudah
     terbiasa dan cuma butuh cara mengerjakan sesuatu, langsung lompat ke
-    <strong>Bagian 4: Resep Kerja</strong>.
+    <strong>Bagian 5: Resep Kerja</strong>.
   </div>
 
   <div class="cover-foot">
@@ -135,10 +135,11 @@
   <tr class="alt"><td style="padding-left:20px">Master Data</td><td>Pelanggan, Power Meter</td></tr>
   <tr><td style="padding-left:20px">Tarif &amp; Konfigurasi</td><td>Golongan &amp; Tarif, Jadwal WBP/LWBP</td></tr>
   <tr class="alt"><td style="padding-left:20px">Report</td><td>Empat macam laporan</td></tr>
-  <tr><td style="padding-left:20px">Sistem</td><td>Setting, User, Role, Log, Hapus Data Uji</td></tr>
-  <tr class="alt"><td><strong>Bagian 4 — Resep Kerja</strong></td><td>Langkah demi langkah untuk tugas sehari-hari</td></tr>
-  <tr><td><strong>Bagian 5 — Hak Akses</strong></td><td>Siapa boleh apa, dan kenapa tombolmu tidak muncul</td></tr>
-  <tr class="alt"><td><strong>Bagian 6 — Kalau Ada Masalah</strong></td><td>Gangguan yang sering terjadi dan cara mengatasinya</td></tr>
+  <tr><td style="padding-left:20px">Sistem</td><td>Setting, User, Role, Akun Portal, Log, Hapus Data Uji</td></tr>
+  <tr class="alt"><td><strong>Bagian 4 — Portal Pelanggan</strong></td><td>{{ $totalPortalPages }} halaman yang dilihat pelanggan, bukan staf</td></tr>
+  <tr><td><strong>Bagian 5 — Resep Kerja</strong></td><td>Langkah demi langkah untuk tugas sehari-hari</td></tr>
+  <tr class="alt"><td><strong>Bagian 6 — Hak Akses</strong></td><td>Siapa boleh apa, dan kenapa tombolmu tidak muncul</td></tr>
+  <tr><td><strong>Bagian 7 — Kalau Ada Masalah</strong></td><td>Gangguan yang sering terjadi dan cara mengatasinya</td></tr>
 </table>
 
 {{-- ═══════════════════════ BAGIAN 1 — KENALAN ═════════════════════════ --}}
@@ -291,6 +292,12 @@
   <tr><td><strong>Badge status</strong></td>
     <td>Label kecil berwarna. Hijau = beres, kuning = perlu perhatian,
       merah = bermasalah, abu-abu = tidak aktif.</td></tr>
+  <tr><td><strong>Angka</strong></td>
+    <td>Angka teknis — kWh, stand meter, kW, tegangan, arus — selalu ditulis
+      dengan <strong>dua angka di belakang koma</strong>, memakai titik sebagai
+      pemisah ribuan: <strong>8.070,61</strong>. Angkanya sama persis dengan
+      yang dipakai menghitung tagihan, jadi total di layar dan total di invoice
+      tidak akan berselisih. Nominal rupiah tetap dibulatkan ke rupiah penuh.</td></tr>
   <tr class="alt"><td><strong>Kotak konfirmasi</strong></td>
     <td>Muncul sebelum tindakan yang sulit dibatalkan. Baca dulu isinya —
       kalimatnya menjelaskan apa yang akan terjadi. Tombol merah berarti
@@ -407,12 +414,11 @@
                         'Daftar periode sebelumnya beserta statusnya.',
                     ],
                     'buttons' => [
-                        ['Generate', 'Membuat invoice untuk semua pelanggan yang siap ditagih. Aman diulang — pelanggan yang sudah punya invoice akan dilewati.'],
-                        ['Buat ulang (centang)', 'Menimpa invoice yang masih berstatus draft. Yang sudah terbit tidak ikut tertimpa.'],
+                        ['Generate', 'Membuat invoice untuk pelanggan yang belum punya, dan menghitung ulang invoice yang masih berstatus draft dengan data terbaru. Invoice yang sudah terbit tidak pernah tersentuh.'],
                         ['Tutup Periode', 'Mengunci periode supaya tidak bisa digenerate lagi. Lakukan setelah semua beres.'],
                         ['Buka Periode', 'Membuka kembali periode yang tertutup.'],
                     ],
-                    'gotcha' => 'Invoice hasil generate berhenti sebagai draft — belum ditagihkan. Kamu masih harus memeriksanya lalu menekan Terbitkan di halaman Daftar Invoice. Ini disengaja, supaya angka yang salah tidak terlanjur sampai ke pelanggan.',
+                    'gotcha' => 'Invoice hasil generate berhenti sebagai draft — belum ditagihkan. Kamu masih harus memeriksanya lalu menekan Terbitkan di halaman Daftar Invoice. Ini disengaja, supaya angka yang salah tidak terlanjur sampai ke pelanggan. Perlu diingat: menekan Generate lagi akan menghitung ulang seluruh draft di periode itu, termasuk tanggal jatuh temponya, yang dihitung dari hari kamu menekan tombolnya.',
                 ],
                 [
                     'title' => 'Daftar Invoice',
@@ -657,18 +663,21 @@
                     'title' => 'Setting Aplikasi',
                     'who' => 'Butuh izin: Kelola setting aplikasi',
                     'shot' => 'settings',
-                    'what' => 'Pusat pengaturan: identitas perusahaan, aturan penagihan, kuitansi, dan sambungan alat.',
+                    'what' => 'Pusat pengaturan: identitas perusahaan, aturan penagihan, kuitansi, pengiriman email, dan sambungan alat.',
                     'see' => [
                         'Identitas: nama, alamat, logo, NPWP.',
-                        'Penagihan: tanggal generate, jatuh tempo, format nomor, pajak, pembulatan.',
-                        'Kuitansi: format nomor dan pengiriman otomatis.',
-                        'IoT: interval kirim, ambang offline, lama penyimpanan data.',
+                        'Penagihan: tanggal generate, jatuh tempo, format nomor, pajak, pembulatan, dan penerbitan otomatis.',
+                        'Kuitansi: format nomor, penerbitan otomatis, dan pengiriman otomatis beserta masa tunggunya.',
+                        'SMTP & Pengirim Email: host, port, kredensial, enkripsi, serta nama dan alamat yang terlihat pelanggan sebagai pengirim.',
+                        'IoT: token gateway, interval kirim, ambang offline, lama penyimpanan data.',
                     ],
                     'buttons' => [
-                        ['Simpan', 'Menyimpan semua perubahan.'],
-                        ['Generate token', 'Membuat kunci baru untuk gateway.'],
+                        ['Simpan Perubahan', 'Menyimpan seluruh kartu sekaligus, bukan hanya kartu yang sedang kamu lihat.'],
+                        ['Generate Token Baru', 'Membuat kunci baru untuk gateway.'],
+                        ['Kirim Email Uji', 'Mengirim satu email percobaan ke alamat akunmu sendiri, memakai setelan yang sudah disimpan.'],
+                        ['Hapus password', 'Membuang password SMTP yang tersimpan. Hanya perlu untuk mail server yang justru tidak memakai autentikasi.'],
                     ],
-                    'gotcha' => 'Mengganti token API akan memutus semua gateway sampai teknisi memasukkan token yang baru. Jangan lakukan tanpa berkoordinasi.',
+                    'gotcha' => 'Tiga hal yang mudah terlewat di halaman ini. Pertama, mengganti token API memutus semua gateway sampai teknisi memasukkan token baru — jangan lakukan tanpa berkoordinasi. Kedua, kolom SMTP yang dibiarkan kosong berarti aplikasi memakai setelan bawaan di server, bukan berarti pengiriman email mati. Ketiga, setelah mengubah setelan SMTP, minta teknisi menyalakan ulang layanan pengiriman — email berjalan lewat antrean yang membaca setelan hanya saat dijalankan.',
                 ],
                 [
                     'title' => 'User Management',
@@ -695,11 +704,28 @@
                     'gotcha' => 'Super Admin selalu punya semua izin, apa pun yang tercentang di sana. Itu memang disengaja supaya tidak ada kemungkinan mengunci diri sendiri.',
                 ],
                 [
+                    'title' => 'Akun Portal Pelanggan',
+                    'who' => 'Butuh izin: Lihat akun portal pelanggan',
+                    'shot' => 'customer-users',
+                    'what' => 'Membuat dan mengelola akun yang dipakai pelanggan untuk masuk ke Portal Pelanggan, serta menentukan data pelanggan mana yang boleh dilihat tiap akun.',
+                    'see' => [
+                        'Daftar akun portal beserta perannya dan status aktifnya.',
+                        'Jumlah pelanggan yang boleh diakses tiap akun.',
+                        'Pilihan peran portal: Pelanggan (Penuh) atau Pelanggan (Pantau Saja).',
+                    ],
+                    'buttons' => [
+                        ['Tambah Akun', 'Membuat akun portal baru beserta password awalnya.'],
+                        ['Ubah', 'Menyunting akun, mengganti perannya, atau mengganti daftar pelanggan yang boleh diaksesnya.'],
+                        ['Nonaktifkan', 'Menutup akses tanpa menghapus akunnya.'],
+                    ],
+                    'gotcha' => 'Daftar pelanggan yang kamu pilih di sini adalah satu-satunya pembatas data di portal — akun hanya melihat pelanggan yang tercantum, tidak lebih. Satu akun boleh diberi beberapa pelanggan sekaligus, misalnya satu grup usaha dengan beberapa titik ukur. Akun portal tidak bisa dipakai masuk ke aplikasi staf, dan sebaliknya; keduanya tersimpan terpisah.',
+                ],
+                [
                     'title' => 'Log Aktivitas',
                     'who' => 'Butuh izin: Lihat log aktivitas',
                     'shot' => 'activity-logs',
                     'what' => 'Catatan siapa melakukan apa dan kapan. Dipakai saat ada yang perlu ditelusuri.',
-                    'see' => ['Waktu, pengguna, tindakan, dan keterangannya.'],
+                    'see' => ['Waktu, pelaku, tindakan, dan keterangannya. Pelaku dari Portal Pelanggan ditandai khusus, jadi tindakan staf dan tindakan pelanggan tidak tertukar.'],
                     'buttons' => [['Filter', 'Menyaring berdasarkan pengguna atau jenis tindakan.']],
                     'gotcha' => 'Catatan ini tidak bisa disunting siapa pun, termasuk Super Admin. Memang begitu seharusnya.',
                 ],
@@ -775,9 +801,205 @@
   @endforeach
 @endforeach
 
-{{-- ═══════════════════ BAGIAN 4 — RESEP KERJA ═════════════════════════ --}}
+{{-- ═════════════════ BAGIAN 4 — PORTAL PELANGGAN ══════════════════════ --}}
 <div class="page-break"></div>
-<h2>Bagian 4 — Resep Kerja</h2>
+<h2>Bagian 4 — Portal Pelanggan</h2>
+
+<p>
+  Portal Pelanggan adalah halaman terpisah yang dibuka <strong>pelanggan</strong>,
+  bukan staf. Isinya hanya tagihan dan pemakaian miliknya sendiri: pelanggan bisa
+  memeriksa pemakaian listriknya, mengunduh invoice, dan mengambil kuitansi tanpa
+  perlu menghubungi petugas.
+</p>
+
+<p>
+  Bagian ini ditulis untuk staf yang <strong>mendampingi</strong> pelanggan —
+  membuatkan akunnya, dan menjawab pertanyaan tentang apa yang pelanggan lihat
+  di layarnya. Halaman-halaman berikut tidak bisa dibuka dari menu aplikasi staf.
+</p>
+
+<table class="t">
+  <tr><th style="width:160px">Hal</th><th>Keterangan</th></tr>
+  <tr><td><strong>Alamat masuk</strong></td><td>Alamat aplikasi ditambah <strong>/portal/login</strong> — berbeda dari halaman masuk staf.</td></tr>
+  <tr class="alt"><td><strong>Akunnya dibuat di</strong></td><td>Sistem &rarr; Akun Portal Pelanggan, oleh staf yang punya izinnya.</td></tr>
+  <tr><td><strong>Yang terlihat</strong></td><td>Hanya pelanggan yang dicantumkan pada akun itu. Tidak ada jalan melihat pelanggan lain.</td></tr>
+  <tr class="alt"><td><strong>Yang tidak pernah terlihat</strong></td><td>Invoice berstatus draft dan invoice yang dibatalkan. Keduanya bukan tagihan yang berlaku.</td></tr>
+</table>
+
+<div class="note">
+  <span class="note-title">Kenapa akun portal dipisah dari akun staf?</span>
+  Akun portal tersimpan terpisah dari akun staf, dengan halaman masuk sendiri.
+  Artinya akun pelanggan tidak punya jalan menuju menu staf sama sekali — bukan
+  karena menunya disembunyikan, melainkan karena akunnya memang bukan bagian
+  dari sana. Satu orang staf tetap bisa masuk ke keduanya sekaligus pada satu
+  browser, dan itu berguna saat perlu memastikan apa yang benar-benar dilihat
+  pelanggan.
+</div>
+
+<div class="warn">
+  <span class="warn-title">Keluhan yang paling sering masuk</span>
+  Pelanggan menyebut tagihannya belum muncul di portal, padahal staf sudah
+  menggenerate invoicenya. Penyebabnya hampir selalu sama: invoice itu masih
+  berstatus <strong>draft</strong>. Portal sengaja tidak menampilkan draft karena
+  angkanya masih bisa berubah. Tekan Terbitkan di Daftar Invoice, dan tagihannya
+  langsung terlihat pelanggan.
+</div>
+
+@php
+    /**
+     * Halaman portal disusun dengan bentuk data yang sama seperti Bagian 3,
+     * sehingga tata letak, tangkapan layar, dan tabel tombolnya seragam.
+     */
+    $portalPages = [
+        [
+            'title' => 'Masuk ke Portal',
+            'who' => 'Dibuka pelanggan, tanpa perlu izin apa pun',
+            'shot' => 'portal-login',
+            'what' => 'Halaman masuk khusus pelanggan, terpisah dari halaman masuk staf.',
+            'see' => [
+                'Kolom username atau email, dan password.',
+                'Pilihan "Ingat saya" supaya tidak perlu masuk berulang di perangkat yang sama.',
+            ],
+            'buttons' => [
+                ['Masuk', 'Membuka portal bila akunnya aktif dan passwordnya benar.'],
+            ],
+            'gotcha' => 'Pelanggan tidak bisa mengganti passwordnya sendiri, dan tidak ada tombol lupa password. Bila pelanggan lupa, staf yang menggantinya dari Sistem → Akun Portal Pelanggan. Ini disengaja: penggantian password lewat email menuntut kotak masuk pelanggan benar-benar terverifikasi, dan itu belum tentu berlaku untuk alamat yang diinput staf.',
+        ],
+        [
+            'title' => 'Dashboard Portal',
+            'who' => 'Dilihat semua akun portal',
+            'shot' => 'portal-dashboard',
+            'what' => 'Ringkasan singkat: pemakaian bulan ini, tagihan berjalan, dan kondisi meter.',
+            'see' => [
+                'Total pemakaian kWh bulan berjalan.',
+                'Nilai tagihan yang belum dibayar.',
+                'Kondisi meter — sedang mengirim data atau tidak.',
+            ],
+            'buttons' => [
+                ['Menu di samping', 'Berpindah ke monitoring, rekap pemakaian, invoice, atau riwayat pembayaran.'],
+            ],
+            'gotcha' => 'Bila pelanggan punya lebih dari satu titik ukur, angka di sini adalah gabungan seluruh meter yang boleh ia lihat — bukan salah satu saja.',
+        ],
+        [
+            'title' => 'Monitoring Real-time',
+            'who' => 'Butuh izin portal: Lihat monitoring',
+            'shot' => 'portal-monitoring',
+            'what' => 'Kondisi listrik saat ini: daya yang sedang dipakai, tegangan, dan arus per meter.',
+            'see' => [
+                'Kartu per meter berisi daya sesaat, tegangan, dan arus.',
+                'Penanda meter yang sedang tidak mengirim data.',
+            ],
+            'buttons' => [
+                ['Segarkan otomatis', 'Memperbarui angka secara berkala tanpa perlu memuat ulang halaman.'],
+            ],
+            'gotcha' => 'Angka daya di sini bersatuan kW dan menunjukkan pemakaian pada saat itu — bukan jumlah pemakaian. Yang ditagihkan adalah kWh, yaitu daya dikali lama pemakaian. Jadi angka kW yang tinggi sebentar tidak otomatis berarti tagihan besar.',
+        ],
+        [
+            'title' => 'Riwayat Energi',
+            'who' => 'Butuh izin portal: Lihat monitoring',
+            'shot' => 'portal-history',
+            'what' => 'Grafik pemakaian per jam, per hari, dan per bulan, beserta tabel angkanya.',
+            'see' => [
+                'Grafik batang pemakaian, terpisah antara LWBP dan WBP.',
+                'Tabel harian berisi angka persisnya.',
+                'Ringkasan total, rata-rata harian, dan beban puncak.',
+            ],
+            'buttons' => [
+                ['Pilih meter dan periode', 'Mengganti meter atau bulan yang ditampilkan.'],
+            ],
+            'gotcha' => 'WBP (Waktu Beban Puncak) tarifnya lebih mahal daripada LWBP. Grafik ini memisahkan keduanya justru supaya pelanggan bisa melihat berapa banyak pemakaiannya jatuh di jam mahal — dan itu informasi yang paling berguna untuk menurunkan tagihan.',
+        ],
+        [
+            'title' => 'Rekap Pemakaian kWh',
+            'who' => 'Butuh izin portal: Lihat rekap pemakaian',
+            'shot' => 'portal-usage',
+            'what' => 'Rekap pemakaian dalam satu rentang tanggal, siap dibandingkan antar periode.',
+            'see' => [
+                'Pemakaian LWBP, WBP, dan totalnya.',
+                'Beban puncak pada rentang itu.',
+            ],
+            'buttons' => [
+                ['Pilih rentang tanggal', 'Menentukan periode yang direkap.'],
+            ],
+            'gotcha' => 'Angka di halaman ini dihitung dari pembacaan meter pada rentang yang dipilih, sehingga bisa berbeda tipis dari angka di invoice bila rentangnya tidak sama persis dengan periode tagihan. Yang mengikat secara tagihan tetap angka di invoice.',
+        ],
+        [
+            'title' => 'Invoice',
+            'who' => 'Butuh izin portal: Lihat invoice',
+            'shot' => 'portal-invoices',
+            'what' => 'Daftar tagihan pelanggan beserta statusnya, lengkap dengan unduhan PDF.',
+            'see' => [
+                'Nomor invoice, periode, jatuh tempo, nilai tagihan, dan statusnya.',
+                'Penanda tagihan yang sudah lewat jatuh tempo.',
+            ],
+            'buttons' => [
+                ['Pratinjau', 'Membuka invoice di layar tanpa mengunduh.'],
+                ['Unduh', 'Mengambil invoice sebagai berkas PDF.'],
+            ],
+            'gotcha' => 'Hanya invoice yang sudah diterbitkan yang muncul di sini. Invoice draft dan invoice yang dibatalkan sengaja tidak ditampilkan — draft angkanya belum tentu final, dan yang dibatalkan sudah tidak berlaku sebagai tagihan.',
+        ],
+        [
+            'title' => 'Riwayat Pembayaran',
+            'who' => 'Butuh izin portal: Lihat pembayaran',
+            'shot' => 'portal-payments',
+            'what' => 'Catatan pembayaran yang sudah tercatat, beserta kuitansinya.',
+            'see' => [
+                'Tanggal bayar, jumlah, metode, dan invoice yang dilunasi.',
+                'Kuitansi untuk tiap pembayaran.',
+            ],
+            'buttons' => [
+                ['Unduh Kuitansi', 'Mengambil kuitansi sebagai berkas PDF.'],
+            ],
+            'gotcha' => 'Pembayaran baru muncul setelah staf mencatatnya di aplikasi — bukan otomatis saat uang masuk ke rekening. Jadi jeda satu-dua hari antara transfer dan munculnya catatan di sini adalah hal yang normal, bukan tanda pembayarannya tidak diterima. Satu invoice yang dicicil menghasilkan beberapa baris, masing-masing dengan kuitansinya sendiri.',
+        ],
+    ];
+@endphp
+
+@foreach ($portalPages as $page)
+  <div class="page-break"></div>
+
+  <div class="menu-head">
+    <div class="menu-title">{{ $page['title'] }}</div>
+    <div class="menu-who">{{ $page['who'] }}</div>
+  </div>
+
+  <p>{{ $page['what'] }}</p>
+
+  @if ($has($page['shot']))
+    <div class="shot">
+      <img src="{{ $shot($page['shot']) }}" alt="{{ $page['title'] }}">
+      <div class="shot-cap">Portal Pelanggan — {{ $page['title'] }}</div>
+    </div>
+  @else
+    <div class="shot-missing">[ Tangkapan layar {{ $page['shot'] }} belum tersedia ]</div>
+  @endif
+
+  <h4>Apa yang dilihat pelanggan</h4>
+  <ul>
+    @foreach ($page['see'] as $item)
+      <li>{{ $item }}</li>
+    @endforeach
+  </ul>
+
+  <h4>Tombol dan akibatnya</h4>
+  <table class="t">
+    @foreach ($page['buttons'] as $n => $btn)
+      <tr class="{{ $n % 2 ? 'alt' : '' }}">
+        <td style="width:150px"><strong>{{ $btn[0] }}</strong></td>
+        <td>{{ $btn[1] }}</td>
+      </tr>
+    @endforeach
+  </table>
+
+  <div class="warn">
+    <span class="warn-title">Yang sering bikin bingung</span>
+    {{ $page['gotcha'] }}
+  </div>
+@endforeach
+
+{{-- ═══════════════════ BAGIAN 5 — RESEP KERJA ═════════════════════════ --}}
+<div class="page-break"></div>
+<h2>Bagian 5 — Resep Kerja</h2>
 
 <p>
   Bagian ini bisa langsung diikuti tanpa membaca yang lain. Tiap resep berisi
@@ -848,6 +1070,20 @@
             ],
         ],
         [
+            'title' => 'Memberi pelanggan akses ke Portal Pelanggan',
+            'when' => 'Pelanggan ingin memeriksa tagihan dan pemakaiannya sendiri, tanpa harus menghubungi petugas.',
+            'steps' => [
+                'Buka <strong>Sistem → Akun Portal Pelanggan</strong>, tekan <strong>Tambah Akun</strong>.',
+                'Isi nama, username, dan email penanggung jawab di pihak pelanggan.',
+                'Pilih perannya: <strong>Pelanggan (Penuh)</strong> bila boleh melihat tagihan, atau <strong>Pelanggan (Pantau Saja)</strong> bila hanya perlu memantau pemakaian tanpa melihat nominal.',
+                'Pilih pelanggan yang boleh diaksesnya. Centang lebih dari satu bila pelanggan itu punya beberapa titik ukur.',
+                'Isi password awal, lalu simpan.',
+                'Sampaikan ke pelanggan: alamat aplikasi ditambah <strong>/portal/login</strong>, beserta username dan password awalnya.',
+                'Minta pelanggan mengganti passwordnya — bila belum tersedia di portal, penggantian dilakukan staf dari halaman yang sama.',
+                'Pastikan invoice yang ingin dilihat pelanggan sudah <strong>diterbitkan</strong>, bukan masih draft. Draft tidak pernah tampil di portal.',
+            ],
+        ],
+        [
             'title' => 'Tarif listrik naik',
             'when' => 'Ada penyesuaian harga dari PLN atau kebijakan pengelola.',
             'steps' => [
@@ -871,9 +1107,9 @@
   </ol>
 @endforeach
 
-{{-- ═══════════════════ BAGIAN 5 — HAK AKSES ═══════════════════════════ --}}
+{{-- ═══════════════════ BAGIAN 6 — HAK AKSES ═══════════════════════════ --}}
 <div class="page-break"></div>
-<h2>Bagian 5 — Hak Akses</h2>
+<h2>Bagian 6 — Hak Akses</h2>
 
 <p>
   Tidak semua orang boleh melakukan semua hal. Aplikasi ini memakai
@@ -881,17 +1117,43 @@
   pengguna mendapat satu peran.
 </p>
 
-<h3>Empat peran bawaan</h3>
+<p>
+  Peran dibagi dua kelompok yang tidak pernah bercampur: peran <strong>staf</strong>
+  untuk yang masuk lewat halaman utama, dan peran <strong>portal</strong> untuk
+  akun pelanggan. Satu akun staf tidak bisa diberi peran portal, dan sebaliknya.
+</p>
+
+<h3>Peran staf</h3>
 
 <table class="t">
   <tr><th style="width:110px">Peran</th><th>Untuk siapa, dan bisa apa</th></tr>
-  @foreach ($roles as $n => $role)
+  @foreach ($staffRoles as $n => $role)
     <tr class="{{ $n % 2 ? 'alt' : '' }}">
       <td><strong>{{ $role->name }}</strong></td>
       <td>{{ $role->description }}</td>
     </tr>
   @endforeach
 </table>
+
+<h3>Peran portal pelanggan</h3>
+
+<table class="t">
+  <tr><th style="width:110px">Peran</th><th>Untuk siapa, dan bisa apa</th></tr>
+  @foreach ($portalRoles as $n => $role)
+    <tr class="{{ $n % 2 ? 'alt' : '' }}">
+      <td><strong>{{ $role->name }}</strong></td>
+      <td>{{ $role->description }}</td>
+    </tr>
+  @endforeach
+</table>
+
+<div class="note">
+  <span class="note-title">Kapan memakai Pantau Saja?</span>
+  Untuk pihak yang perlu memantau pemakaian listrik tapi tidak berkepentingan
+  dengan nominal tagihan — misalnya teknisi gedung atau manajer operasional di
+  sisi pelanggan. Peran itu tidak bisa membuka invoice maupun riwayat pembayaran,
+  sehingga angka rupiah tidak pernah terlihat.
+</div>
 
 <div class="note">
   <span class="note-title">Kenapa tombolku tidak muncul?</span>
@@ -901,11 +1163,12 @@
   layar, itu bukan kerusakan — mintalah izinnya ke Super Admin.
 </div>
 
-<h3>Daftar lengkap izin</h3>
+<h3>Daftar lengkap izin staf</h3>
 
 <p style="font-size:9.5px;color:#64748b">
   Tanda centang berarti peran itu memilikinya. Super Admin sengaja tidak
-  ditampilkan karena selalu punya semuanya.
+  ditampilkan karena selalu punya semuanya. Izin portal pelanggan ada di tabel
+  tersendiri sesudah ini — keduanya tidak pernah saling berlaku.
 </p>
 
 @foreach ($permissionGroups as $groupName => $items)
@@ -934,9 +1197,41 @@
   </table>
 @endforeach
 
-{{-- ═══════════════ BAGIAN 6 — KALAU ADA MASALAH ═══════════════════════ --}}
+<h3>Daftar lengkap izin portal pelanggan</h3>
+
+<p style="font-size:9.5px;color:#64748b">
+  Izin ini hanya berlaku di Portal Pelanggan. Tidak ada peran staf yang
+  memilikinya, dan tidak ada di antaranya yang membuka satu pun halaman staf.
+</p>
+
+@foreach ($portalPermissionGroups as $groupName => $items)
+  <table class="t">
+    <tr>
+      <th>Izin</th>
+      @foreach ($portalRoles as $role)
+        <th style="width:80px;text-align:center">{{ $role->name }}</th>
+      @endforeach
+    </tr>
+    @foreach ($items as $n => $permission)
+      <tr class="{{ $n % 2 ? 'alt' : '' }}">
+        <td>{{ $permission->name }}</td>
+        @foreach ($portalRoles as $role)
+          <td class="c">
+            @if ($role->permissions->contains('id', $permission->id))
+              <span class="yes">&#10003;</span>
+            @else
+              <span class="no">&ndash;</span>
+            @endif
+          </td>
+        @endforeach
+      </tr>
+    @endforeach
+  </table>
+@endforeach
+
+{{-- ═══════════════ BAGIAN 7 — KALAU ADA MASALAH ═══════════════════════ --}}
 <div class="page-break"></div>
-<h2>Bagian 6 — Kalau Ada Masalah</h2>
+<h2>Bagian 7 — Kalau Ada Masalah</h2>
 
 <table class="t">
   <tr><th style="width:180px">Gejala</th><th>Kemungkinan sebab &amp; apa yang bisa kamu lakukan</th></tr>
@@ -978,7 +1273,7 @@
   </tr>
   <tr>
     <td><strong>Tombol yang dicari tidak ada</strong></td>
-    <td>Kemungkinan besar peranmu tidak punya izinnya. Lihat Bagian 5.</td>
+    <td>Kemungkinan besar peranmu tidak punya izinnya. Lihat Bagian 6.</td>
   </tr>
   <tr class="alt">
     <td><strong>Tidak bisa generate ulang</strong></td>

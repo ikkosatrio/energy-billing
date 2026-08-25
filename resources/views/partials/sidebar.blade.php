@@ -97,8 +97,6 @@
         @endforeach
     </nav>
 
-    @include('partials.gateway-status')
-
     <div class="sidebar-user">
         <div class="sidebar-avatar">{{ $user?->initials }}</div>
         <div style="flex:1;min-width:0">
