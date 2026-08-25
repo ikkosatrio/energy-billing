@@ -207,6 +207,35 @@ class Invoice extends Model
         return $query->whereIn('status', ['issued', 'partial', 'overdue']);
     }
 
+    /**
+     * Status yang TIDAK boleh terlihat pelanggan di portal.
+     *
+     *   draft     — belum resmi ditagihkan, angkanya masih bisa berubah.
+     *   cancelled — bukan tagihan yang berlaku; menampilkannya hanya memicu
+     *               pertanyaan atas dokumen yang sudah tidak berarti.
+     */
+    public const HIDDEN_FROM_PORTAL = ['draft', 'cancelled'];
+
+    /**
+     * Invoice yang boleh dilihat pelanggan di portal.
+     *
+     * Didefinisikan di model, bukan diulang di tiap halaman portal: aturannya
+     * dipakai daftar invoice, filter status, unduhan PDF, dan riwayat
+     * pembayaran sekaligus — empat tempat yang kalau ditulis sendiri-sendiri
+     * pasti ada yang tertinggal saat aturannya berubah, dan yang tertinggal
+     * itulah yang membocorkan dokumen ke pihak luar.
+     */
+    public function scopePortalVisible(Builder $query): Builder
+    {
+        return $query->whereNotIn('status', self::HIDDEN_FROM_PORTAL);
+    }
+
+    /** Padanan scopePortalVisible() untuk satu baris yang sudah dimuat. */
+    public function isVisibleToPortal(): bool
+    {
+        return !in_array($this->status, self::HIDDEN_FROM_PORTAL, true);
+    }
+
     public function scopeForPeriod(Builder $query, int $periodId): Builder
     {
         return $query->where('billing_period_id', $periodId);

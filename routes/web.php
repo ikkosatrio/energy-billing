@@ -11,6 +11,9 @@ use App\Http\Controllers\Master\PowerMeterController;
 use App\Http\Controllers\Monitoring\DeviceController;
 use App\Http\Controllers\Monitoring\HistoryController;
 use App\Http\Controllers\Monitoring\RealtimeController;
+use App\Http\Controllers\Portal\DocumentController as PortalDocumentController;
+use App\Http\Controllers\Portal\LoginController as PortalLoginController;
+use App\Http\Controllers\Portal\PageController as PortalPageController;
 use App\Http\Controllers\Report\ReportController;
 use App\Http\Controllers\System\ActivityLogController;
 use App\Http\Controllers\System\CustomerUserController;
@@ -36,12 +39,69 @@ use Illuminate\Support\Facades\Route;
 // Health check container (dipakai Docker HEALTHCHECK).
 Route::get('/health', fn () => response('OK', 200));
 
-Route::middleware('guest')->group(function () {
+/*
+ * Guard ditulis eksplisit ('web'), tidak dibiarkan mengikuti guard default.
+ *
+ * `auth` tanpa argumen memakai guard default, dan sejak ada guard kedua nilai
+ * itu bisa bergeser dalam satu request (mis. Auth::shouldUse). Beberapa route
+ * staf — /dashboard dan /panduan — sengaja tanpa `can:` apa pun, jadi guard
+ * itulah satu-satunya penahannya: begitu ia bergeser, panel staf terbuka
+ * untuk akun portal.
+ */
+Route::middleware('guest:web')->group(function () {
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [LoginController::class, 'login']);
 });
 
-Route::middleware('auth')->group(function () {
+/*
+|--------------------------------------------------------------------------
+| Portal Pelanggan
+|--------------------------------------------------------------------------
+|
+| Guard 'customer', bukan 'web'. Ditulis di blok tersendiri di atas modul staf
+| supaya tidak ada satu pun route portal yang bisa ikut terbawa ke dalam grup
+| middleware('auth') di bawah — di sana guard-nya staf, dan akun portal akan
+| ditolak dengan pesan yang menyesatkan.
+|
+*/
+Route::prefix('portal')->name('portal.')->group(function () {
+    Route::middleware('guest:customer')->group(function () {
+        Route::get('login', [PortalLoginController::class, 'showLoginForm'])->name('login');
+        Route::post('login', [PortalLoginController::class, 'login']);
+    });
+
+    Route::middleware('auth:customer')->group(function () {
+        Route::post('logout', [PortalLoginController::class, 'logout'])->name('logout');
+
+        Route::get('/', [PortalPageController::class, 'dashboard'])->name('dashboard');
+
+        Route::middleware('can:portal.monitoring.view')->group(function () {
+            Route::get('monitoring', [PortalPageController::class, 'monitoring'])->name('monitoring');
+            Route::get('riwayat', [PortalPageController::class, 'history'])->name('history');
+        });
+
+        Route::get('pemakaian', [PortalPageController::class, 'usage'])
+            ->middleware('can:portal.usage.view')->name('usage');
+
+        Route::middleware('can:portal.invoice.view')->group(function () {
+            Route::get('invoice', [PortalPageController::class, 'invoices'])->name('invoices');
+            Route::get('invoice/{invoice}/unduh', [PortalDocumentController::class, 'invoice'])
+                ->name('invoices.download');
+            Route::get('invoice/{invoice}/pratinjau', [PortalDocumentController::class, 'invoicePreview'])
+                ->name('invoices.preview');
+        });
+
+        Route::middleware('can:portal.payment.view')->group(function () {
+            Route::get('pembayaran', [PortalPageController::class, 'payments'])->name('payments');
+            Route::get('pembayaran/{payment}/kuitansi', [PortalDocumentController::class, 'receipt'])
+                ->name('payments.receipt');
+            Route::get('pembayaran/{payment}/kuitansi/pratinjau', [PortalDocumentController::class, 'receiptPreview'])
+                ->name('payments.receipt.preview');
+        });
+    });
+});
+
+Route::middleware('auth:web')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
     Route::get('/', fn () => redirect()->route('dashboard'))->name('home');
