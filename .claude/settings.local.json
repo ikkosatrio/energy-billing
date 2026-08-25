@@ -64,7 +64,10 @@
       "Bash(DB_DATABASE_MAIN=energy_billing_test APP_ENV=testing php artisan migrate:fresh --force)",
       "Bash(pkill -f \"artisan serve\")",
       "Bash(pkill -f \"artisan queue\")",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(python3 -c \"import pypdf; print\\('pypdf ada'\\)\")",
+      "Bash(pip3 install *)",
+      "Bash(perl -0pi -e 's|<span class=\"unit\">|<br><span class=\"unit\">|g' resources/views/billing/invoices/pdf.blade.php)"
     ]
   }
 }
