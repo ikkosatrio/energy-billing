@@ -63,6 +63,22 @@ class SettingSeeder extends Seeder
         // kembali kuitansi yang sudah ada di tangan pelanggan.
         ['receipt_auto_send_days', '3', 'number', 'billing', 'Kirim Kuitansi Setelah (hari)'],
 
+        /*
+         * --- SMTP & Pengirim Email ---
+         *
+         * Dikosongkan saat instalasi supaya nilai dari .env yang dipakai.
+         * Begitu Host diisi dari halaman Setting, seluruh blok ini
+         * mengambil alih — lihat MailConfigurator.
+         */
+        ['mail_mailer', '', 'string', 'mail', 'Pengirim Email'],
+        ['mail_host', '', 'string', 'mail', 'SMTP Host'],
+        ['mail_port', '', 'string', 'mail', 'SMTP Port'],
+        ['mail_username', '', 'string', 'mail', 'SMTP Username'],
+        ['mail_password', '', 'string', 'mail', 'SMTP Password'],
+        ['mail_encryption', '', 'string', 'mail', 'Enkripsi'],
+        ['mail_from_address', '', 'string', 'mail', 'Email Pengirim'],
+        ['mail_from_name', '', 'string', 'mail', 'Nama Pengirim'],
+
         // --- Integrasi IoT ---
         ['iot_push_interval_seconds', '60', 'number', 'iot', 'Interval Push Gateway (detik)'],
         ['iot_offline_after_minutes', '5', 'number', 'iot', 'Meter Offline Setelah (menit)'],

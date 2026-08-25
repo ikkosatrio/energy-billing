@@ -2,9 +2,11 @@
 
 namespace App\Livewire\System;
 
+use App\Mail\SmtpTestMail;
 use App\Models\Setting;
 use App\Services\ActivityLogger;
 use App\Services\SettingService;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -17,6 +19,16 @@ class SettingPage extends Component
     public array $values = [];
 
     public $logo = null;
+
+    /**
+     * Apakah password SMTP sudah tersimpan.
+     *
+     * Nilainya sendiri tidak pernah dikirim ke browser — field passwordnya
+     * selalu dimuat kosong. Halaman Setting bisa dibuka siapa pun yang punya
+     * izin setting.manage, dan password mail server tidak perlu ikut terkirim
+     * ke sana hanya untuk memberi tahu bahwa ia ada.
+     */
+    public bool $mailPasswordStored = false;
 
     public function mount(): void
     {
@@ -32,6 +44,11 @@ class SettingPage extends Component
         foreach (Setting::where('type', 'boolean')->pluck('key') as $key) {
             $this->values[$key] = filter_var($this->values[$key] ?? false, FILTER_VALIDATE_BOOLEAN);
         }
+
+        // Nilai di tabel masih terenkripsi; yang penting di sini hanya ada
+        // atau tidak, bukan isinya.
+        $this->mailPasswordStored = filled($this->values['mail_password'] ?? null);
+        $this->values['mail_password'] = '';
     }
 
     protected function rules(): array
@@ -66,6 +83,17 @@ class SettingPage extends Component
             'values.receipt_auto_issue' => ['boolean'],
             'values.receipt_auto_send' => ['boolean'],
             'values.receipt_auto_send_days' => ['required', 'integer', 'between:0,30'],
+
+            'values.mail_mailer' => ['nullable', 'in:smtp,log'],
+            'values.mail_host' => ['nullable', 'string', 'max:255'],
+            'values.mail_port' => ['nullable', 'integer', 'between:1,65535'],
+            'values.mail_username' => ['nullable', 'string', 'max:255'],
+            'values.mail_password' => ['nullable', 'string', 'max:255'],
+            'values.mail_encryption' => ['nullable', 'in:tls,ssl,none'],
+            // 'email:filter' menolak CRLF — alamat pengirim masuk ke header
+            // email, tempat baris baru bisa dipakai menyuntik header lain.
+            'values.mail_from_address' => ['nullable', 'email:filter', 'max:255'],
+            'values.mail_from_name' => ['nullable', 'string', 'max:100'],
 
             'values.iot_push_interval_seconds' => ['required', 'integer', 'min:1'],
             'values.iot_offline_after_minutes' => ['required', 'integer', 'min:1'],
@@ -102,6 +130,12 @@ class SettingPage extends Component
             'values.invoice_rounding_to' => 'pembulatan total',
             'values.receipt_number_format' => 'format nomor kuitansi',
             'values.receipt_auto_send_days' => 'jeda kirim kuitansi',
+            'values.mail_host' => 'SMTP host',
+            'values.mail_port' => 'SMTP port',
+            'values.mail_username' => 'SMTP username',
+            'values.mail_password' => 'SMTP password',
+            'values.mail_from_address' => 'email pengirim',
+            'values.mail_from_name' => 'nama pengirim',
             'values.api_token' => 'API token',
         ];
     }
@@ -148,7 +182,20 @@ class SettingPage extends Component
             $this->values['company_logo'] = $this->logo->store('logo', 'public');
         }
 
-        foreach ($this->values as $key => $value) {
+        $values = $this->values;
+
+        /*
+         * Field password yang dibiarkan kosong berarti "jangan diubah", bukan
+         * "hapus". Tanpa penjagaan ini, setiap penyimpanan setelan apa pun —
+         * mengganti PPN, misalnya — akan menghapus password SMTP, dan
+         * pengiriman email berhenti tanpa ada yang menyentuh setelan mail.
+         * Untuk benar-benar menghapusnya ada tombol tersendiri.
+         */
+        if (($values['mail_password'] ?? '') === '') {
+            unset($values['mail_password']);
+        }
+
+        foreach ($values as $key => $value) {
             $settings->put($key, $value);
         }
 
@@ -156,6 +203,62 @@ class SettingPage extends Component
 
         $this->loadValues();
         $this->dispatch('toast', type: 'success', message: 'Setting tersimpan.');
+    }
+
+    /**
+     * Menghapus password SMTP yang tersimpan.
+     *
+     * Dibutuhkan relay internal yang justru menolak autentikasi: field kosong
+     * saja tidak cukup karena kosong berarti "jangan diubah".
+     */
+    public function clearMailPassword(SettingService $settings): void
+    {
+        $this->authorize('setting.manage');
+
+        $settings->put('mail_password', '');
+        $this->values['mail_password'] = '';
+        $this->mailPasswordStored = false;
+
+        ActivityLogger::log('update_setting', description: 'Hapus password SMTP');
+        $this->dispatch('toast', type: 'warning', message: 'Password SMTP dihapus.');
+    }
+
+    /**
+     * Mengirim email percobaan ke alamat operator yang sedang masuk.
+     *
+     * Dikirim langsung, tidak lewat antrean: seluruh gunanya justru
+     * memperlihatkan kegagalan SMTP di layar sekarang. Email aplikasi yang
+     * sebenarnya berjalan lewat antrean, dan di sana kegagalan hanya masuk log
+     * worker — invoice berhenti terkirim tanpa gejala di aplikasi.
+     *
+     * Memakai konfigurasi yang SUDAH TERSIMPAN, karena config mail diterapkan
+     * saat boot. Perubahan yang belum disimpan tidak ikut teruji.
+     */
+    public function sendTestEmail(): void
+    {
+        $this->authorize('setting.manage');
+
+        $to = auth()->user()?->email;
+
+        if (!$to) {
+            $this->dispatch('toast', type: 'error',
+                message: 'Akun Anda belum punya alamat email, jadi tidak ada tujuan uji.');
+
+            return;
+        }
+
+        try {
+            Mail::to($to)->send(new SmtpTestMail(setting('app_name', 'Energy Billing')));
+        } catch (\Throwable $e) {
+            report($e);
+
+            $this->dispatch('toast', type: 'error', message: 'Gagal mengirim: '.$e->getMessage());
+
+            return;
+        }
+
+        ActivityLogger::log('update_setting', description: "Kirim email uji SMTP ke {$to}");
+        $this->dispatch('toast', type: 'success', message: "Email uji terkirim ke {$to}.");
     }
 
     public function render()

@@ -238,6 +238,141 @@
                     </div>
                 </div>
 
+                {{-- ── SMTP & Pengirim Email ───────────────────────────── --}}
+                <div class="card">
+                    <div class="card-title">SMTP &amp; Pengirim Email</div>
+                    <div class="card-sub" style="margin-bottom:16px">
+                        Dipakai mengirim invoice, kuitansi, dan pemberitahuan pembatalan.
+                        Dibiarkan kosong berarti mengikuti konfigurasi <span class="mono">.env</span> di server.
+                    </div>
+
+                    <div class="form-grid form-grid-2">
+                        <div class="field">
+                            <label class="field-label">Pengirim Email</label>
+                            <select class="input @error('values.mail_mailer') is-invalid @enderror"
+                                    wire:model.live="values.mail_mailer">
+                                <option value="">Ikut .env</option>
+                                <option value="smtp">SMTP</option>
+                                <option value="log">Log (tidak benar-benar dikirim)</option>
+                            </select>
+                            @error('values.mail_mailer') <div class="field-error">{{ $message }}</div> @enderror
+                            <div class="card-sub">
+                                Pilih <span class="mono">log</span> saat uji coba: email hanya ditulis ke
+                                <span class="mono">storage/logs</span>, tidak sampai ke pelanggan.
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label class="field-label">Enkripsi</label>
+                            <select class="input @error('values.mail_encryption') is-invalid @enderror"
+                                    wire:model="values.mail_encryption">
+                                <option value="">Ikut .env</option>
+                                <option value="tls">TLS (umumnya port 587)</option>
+                                <option value="ssl">SSL (umumnya port 465)</option>
+                                <option value="none">Tanpa enkripsi</option>
+                            </select>
+                            @error('values.mail_encryption') <div class="field-error">{{ $message }}</div> @enderror
+                        </div>
+                    </div>
+
+                    <div class="form-grid form-grid-2" style="margin-top:14px">
+                        <div class="field">
+                            <label class="field-label">SMTP Host</label>
+                            <input type="text" class="input mono @error('values.mail_host') is-invalid @enderror"
+                                   wire:model.live="values.mail_host"
+                                   placeholder="mis. smtp.gmail.com" autocomplete="off" spellcheck="false">
+                            @error('values.mail_host') <div class="field-error">{{ $message }}</div> @enderror
+                        </div>
+
+                        <div class="field">
+                            <label class="field-label">SMTP Port</label>
+                            <input type="number" min="1" max="65535"
+                                   class="input mono @error('values.mail_port') is-invalid @enderror"
+                                   wire:model="values.mail_port" placeholder="587">
+                            @error('values.mail_port') <div class="field-error">{{ $message }}</div> @enderror
+                        </div>
+                    </div>
+
+                    <div class="form-grid form-grid-2" style="margin-top:14px">
+                        <div class="field">
+                            <label class="field-label">SMTP Username</label>
+                            <input type="text" class="input mono @error('values.mail_username') is-invalid @enderror"
+                                   wire:model="values.mail_username"
+                                   autocomplete="off" spellcheck="false">
+                            @error('values.mail_username') <div class="field-error">{{ $message }}</div> @enderror
+                        </div>
+
+                        <div class="field">
+                            <label class="field-label">SMTP Password</label>
+                            <input type="password" class="input @error('values.mail_password') is-invalid @enderror"
+                                   wire:model="values.mail_password"
+                                   autocomplete="new-password"
+                                   placeholder="{{ $mailPasswordStored ? 'Tersimpan — kosongkan bila tidak diubah' : 'Belum diisi' }}">
+                            @error('values.mail_password') <div class="field-error">{{ $message }}</div> @enderror
+                            <div class="card-sub">
+                                Disimpan terenkripsi dan tidak pernah ditampilkan kembali.
+                                @if ($mailPasswordStored)
+                                    <button type="button" class="link-action muted" style="margin-left:4px"
+                                            x-on:click="ConfirmDialog.show({
+                                                    title: 'Hapus password SMTP?',
+                                                    text: 'Pengiriman invoice dan kuitansi akan gagal sampai passwordnya diisi ulang.',
+                                                    danger: true,
+                                                    confirmText: 'Ya, Hapus',
+                                                    onConfirm: () => $wire.clearMailPassword(),
+                                                })">
+                                        Hapus password
+                                    </button>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-grid form-grid-2" style="margin-top:14px">
+                        <div class="field">
+                            <label class="field-label">Email Pengirim</label>
+                            <input type="text" class="input mono @error('values.mail_from_address') is-invalid @enderror"
+                                   wire:model="values.mail_from_address" placeholder="billing@perusahaan.co.id">
+                            @error('values.mail_from_address') <div class="field-error">{{ $message }}</div> @enderror
+                            <div class="card-sub">
+                                Alamat yang terlihat pelanggan sebagai pengirim. Banyak mail server menolak
+                                kiriman bila domainnya berbeda dari username di atas.
+                            </div>
+                        </div>
+
+                        <div class="field">
+                            <label class="field-label">Nama Pengirim</label>
+                            <input type="text" class="input @error('values.mail_from_name') is-invalid @enderror"
+                                   wire:model="values.mail_from_name" placeholder="{{ setting('company_name') }}">
+                            @error('values.mail_from_name') <div class="field-error">{{ $message }}</div> @enderror
+                        </div>
+                    </div>
+
+                    @can('setting.manage')
+                        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border-soft)">
+                            <button type="button" class="btn btn-outline btn-sm"
+                                    wire:click="sendTestEmail" wire:loading.attr="disabled" wire:target="sendTestEmail">
+                                <i data-lucide="send" style="width:14px;height:14px"></i>
+                                <span wire:loading.remove wire:target="sendTestEmail">Kirim Email Uji</span>
+                                <span wire:loading wire:target="sendTestEmail">Mengirim…</span>
+                            </button>
+                            <div class="card-sub" style="margin-top:8px">
+                                Dikirim ke <span class="mono">{{ auth()->user()->email ?: '—' }}</span> memakai setelan
+                                yang <strong>sudah disimpan</strong> — tekan Simpan Perubahan dulu bila baru diubah.
+                                Dikirim langsung tanpa antrean, jadi kegagalannya langsung terlihat di sini.
+                            </div>
+                        </div>
+                    @endcan
+
+                    @if ($values['mail_mailer'] ?? null)
+                        <div class="alert alert-info" style="margin-top:14px">
+                            Email aplikasi dikirim lewat antrean, jadi container
+                            <span class="mono">queue</span> harus berjalan. Setelan di kartu ini juga
+                            dipakai worker antrean, tapi worker membaca konfigurasi saat start —
+                            <strong>restart worker</strong> setelah mengubahnya.
+                        </div>
+                    @endif
+                </div>
+
                 {{-- ── IoT ─────────────────────────────────────────────── --}}
                 <div class="card">
                     <div class="card-title" style="margin-bottom:16px">Integrasi IoT</div>

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\MailConfigurator;
 use App\Services\SettingService;
 use Carbon\Carbon;
 use Illuminate\Pagination\Paginator;
@@ -23,6 +24,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        /*
+         * Setelan SMTP dari halaman Setting menimpa config mail.
+         *
+         * Dijalankan di boot, bukan saat mailer dipakai: worker antrean
+         * mem-boot aplikasi sendiri, dan di sanalah hampir semua email
+         * aplikasi ini benar-benar terkirim.
+         */
+        $this->app->make(MailConfigurator::class)->apply(config());
+
         // Locale aplikasi tidak otomatis diteruskan ke Carbon, sehingga
         // translatedFormat() akan tetap memakai bahasa Inggris tanpa baris ini.
         Carbon::setLocale(config('app.locale'));
