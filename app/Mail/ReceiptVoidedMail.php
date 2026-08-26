@@ -37,6 +37,15 @@ class ReceiptVoidedMail extends Mailable
 
     public function content(): Content
     {
-        return new Content(view: 'mail.receipt-voided');
+        /*
+         * markdown:, bukan view:.
+         *
+         * Isi email ini memakai komponen <x-mail::message>, yang hidup di
+         * namespace view 'mail' milik Laravel. Namespace itu baru terdaftar
+         * ketika perender Markdown dipakai — dengan view: perender itu tidak
+         * pernah tersentuh, dan rendernya gagal dengan
+         * "No hint path defined for [mail]".
+         */
+        return new Content(markdown: 'mail.receipt-voided');
     }
 }
