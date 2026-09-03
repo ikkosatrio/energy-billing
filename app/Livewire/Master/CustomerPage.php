@@ -143,8 +143,14 @@ class CustomerPage extends Component
             $data['biaya_beban'] = 0;
         }
 
-        $data['daya_kva'] ??= 0;
-        $data['biaya_beban'] ??= 0;
+        /*
+         * Dua kolom ini NOT NULL berdefault 0, jadi dikosongkan di form berarti
+         * nol — bukan "tidak diisi". Perbandingannya harus ikut menangkap
+         * string kosong: input number yang dihapus isinya mengirim '', dan
+         * ??= hanya menangkap null.
+         */
+        $data['daya_kva'] = ($data['daya_kva'] ?? '') === '' ? 0 : $data['daya_kva'];
+        $data['biaya_beban'] = ($data['biaya_beban'] ?? '') === '' ? 0 : $data['biaya_beban'];
 
         if ($this->editingId) {
             $customer = Customer::findOrFail($this->editingId);

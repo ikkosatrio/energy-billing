@@ -37,6 +37,29 @@ class Kernel extends ConsoleKernel
             ->hourly()
             ->withoutOverlapping(5);
 
+        /*
+         * Pengejaran mingguan 40 hari ke belakang.
+         *
+         * Dua jadwal di atas hanya mencakup kemarin dan hari ini, jadi
+         * gangguan yang lebih lama dari sehari — server mati, scheduler belum
+         * terpasang, atau data yang diimpor belakangan — meninggalkan hari
+         * tanpa agregat yang TIDAK PERNAH terkejar sendiri.
+         *
+         * Akibatnya diam: chart bulanan di Energy History menjumlahkan
+         * meter_reading_dailies, sedangkan invoice menghitung ulang dari
+         * selisih stand meter. Hari yang bolong membuat chart membaca lebih
+         * rendah daripada tagihannya untuk bulan itu, selamanya, tanpa ada
+         * yang memberi tahu.
+         *
+         * 40 hari dipilih agar bulan sebelumnya masih ikut terkoreksi setelah
+         * invoicenya terbit. Aman diulang: aggregate() memakai updateOrCreate
+         * dan melewati hari tanpa pembacaan, jadi riwayat lama yang mentahnya
+         * sudah dibuang retensi tidak ikut tertimpa nol.
+         */
+        $schedule->command('readings:aggregate', ['--from' => now()->subDays(40)->toDateString()])
+            ->weeklyOn(0, '03:00')
+            ->withoutOverlapping(30);
+
         // Generate invoice dijalankan tiap hari karena tanggal tagih boleh
         // berbeda per pelanggan; perintahnya sendiri yang menentukan pelanggan
         // mana yang jatuh tempo hari itu.

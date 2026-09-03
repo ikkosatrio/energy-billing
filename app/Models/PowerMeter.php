@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BlankToNull;
+
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +13,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PowerMeter extends Model
 {
-    use HasFactory, SoftDeletes;
+    use BlankToNull, HasFactory, SoftDeletes;
 
     /**
      * Meter dianggap offline bila tidak ada pembacaan masuk selama ini.

@@ -363,9 +363,26 @@ class InvoicePage extends Component
         return [
             'outstanding' => $unpaid->sum(fn ($i) => $i->outstanding),
             'overdue_count' => $unpaid->where('status', 'overdue')->count(),
-            'paid_last_month' => (float) Invoice::whereBetween('issue_date', [
-                $lastMonth->copy()->startOfMonth(), $lastMonth->copy()->endOfMonth(),
-            ])->where('status', 'paid')->sum('total_amount'),
+            /*
+             * Uang yang sudah diterima untuk PERIODE PEMAKAIAN bulan lalu.
+             *
+             * Dua hal yang dulu membuat kartu ini hampir selalu nol:
+             *
+             * 1. Disaring dengan issue_date. Invoice pemakaian Agustus terbit
+             *    awal September, jadi tidak pernah masuk rentang "Agustus"
+             *    sementara labelnya menyebut Agustus.
+             * 2. Hanya menghitung invoice berstatus 'paid', dan menjumlahkan
+             *    total tagihannya. Pembayaran sebagian tidak terhitung sama
+             *    sekali, padahal uangnya sudah masuk — dan begitu invoice
+             *    lunas, angkanya melompat dari nol ke nilai penuh.
+             *
+             * Sekarang yang dijumlahkan adalah paid_amount, yaitu uang yang
+             * benar-benar tercatat diterima, atas invoice periode itu.
+             */
+            'paid_last_month' => (float) Invoice::whereBetween('period_start', [
+                $lastMonth->copy()->startOfMonth()->toDateString(),
+                $lastMonth->copy()->endOfMonth()->toDateString(),
+            ])->where('status', '!=', 'cancelled')->sum('paid_amount'),
             'paid_last_month_label' => $lastMonth->translatedFormat('F Y'),
             'draft_count' => Invoice::where('status', 'draft')->count(),
         ];

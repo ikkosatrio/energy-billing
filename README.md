@@ -428,14 +428,22 @@ request.
 
 ## Perintah terjadwal
 
-| Perintah                  | Jadwal              | Fungsi                                          |
-| ------------------------- | ------------------- | ----------------------------------------------- |
-| `readings:aggregate`      | tiap jam            | Meringkas pembacaan menjadi agregat harian      |
-| `invoices:generate`       | harian, jam setting | Menerbitkan invoice pelanggan yang jatuh tempo  |
-| `invoices:mark-overdue`   | harian 01:00        | Menandai invoice lewat jatuh tempo              |
-| `readings:prune`          | mingguan            | Menghapus pembacaan mentah di luar masa retensi |
+| Perintah                            | Jadwal              | Fungsi                                            |
+| ----------------------------------- | ------------------- | ------------------------------------------------- |
+| `readings:aggregate --today`        | tiap menit          | Menyegarkan agregat hari berjalan                 |
+| `readings:aggregate`                | tiap jam            | Mengulang kemarin, menangkap pembacaan telat      |
+| `readings:aggregate --from=<40 hari>` | mingguan Min 03:00 | Mengejar hari yang agregatnya terlewat            |
+| `invoices:generate`                 | harian, jam setting | Menerbitkan invoice pelanggan yang jatuh tempo    |
+| `invoices:mark-overdue`             | harian 01:00        | Menandai invoice lewat jatuh tempo                |
+| `receipts:send-due`                 | harian 07:00        | Mengirim kuitansi yang sudah lewat masa tunggu    |
+| `readings:prune`                    | mingguan Min 02:00  | Menghapus pembacaan mentah di luar masa retensi   |
 
-Di Docker, ketiganya dijalankan service **`scheduler`** (`schedule:work`) yang
+Pengejaran mingguan itu bukan duplikasi dua baris di atasnya: keduanya hanya
+mencakup kemarin dan hari ini, jadi gangguan yang lebih lama dari sehari
+meninggalkan hari tanpa agregat yang tidak akan pernah terkejar sendiri. Lihat
+[Agregat harian & audit](#agregat-harian--audit).
+
+Di Docker, semuanya dijalankan service **`scheduler`** (`schedule:work`) yang
 sudah ada di `docker-compose.yml`. Untuk development lokal jalankan sendiri:
 
 ```bash
@@ -448,6 +456,86 @@ php artisan schedule:work
 Pengiriman email invoice lewat antrean ditangani service **`queue`**
 (`queue:work`). Tanpa container itu, email otomatis tidak akan terkirim —
 job-nya menumpuk di tabel `jobs`.
+
+## Agregat harian & audit
+
+Ada **dua sumber angka kWh** di aplikasi ini, dan keduanya harus selalu sama:
+
+| Yang membacanya | Sumber |
+| --------------- | ------ |
+| Chart bulanan & tahunan di Energy History, Rekap Pemakaian, portal pelanggan | Menjumlahkan tabel `meter_reading_dailies` |
+| Invoice | Menghitung ulang dari **selisih stand meter** pada periode itu |
+
+Agregat harian ada karena chart tidak mungkin memindai `meter_readings` yang
+bisa berisi jutaan baris. Konsekuensinya: chart hanya sebaik isi tabel agregat
+itu, sedangkan invoice selalu menghitung ulang dari sumber aslinya.
+
+### Kalau chart tidak cocok dengan invoice
+
+Yang salah hampir pasti **chart-nya**, bukan invoice. Rumus keduanya sudah
+dirancang menghasilkan angka identik — agregasi harian memakai pembacaan
+penutup hari sebelumnya sebagai titik awal, persis seperti invoice, sehingga
+pemakaian di pergantian hari tidak hilang.
+
+Dua hal yang membuat isinya melenceng:
+
+| Gejala | Sebab |
+| ------ | ----- |
+| Chart **lebih rendah** dari invoice | Ada hari yang agregatnya tidak pernah dibuat — scheduler mati, deploy, atau server sempat down |
+| Chart **lebih tinggi atau lebih rendah** pada bulan ber-reset | Agregat basi: pembacaan mentahnya berubah setelah hari itu diringkas (data telat masuk, impor ulang) |
+
+Keduanya diam — tidak ada error, tidak ada peringatan. Chart hanya terus
+menampilkan angka yang berbeda dari tagihan untuk bulan itu.
+
+### Memeriksa
+
+```bash
+php artisan readings:audit                              # 12 bulan terakhir, semua meter
+php artisan readings:audit --month=2026-08              # satu bulan
+php artisan readings:audit --meter=PM001 --month=2026-08
+php artisan readings:audit --from=2026-07 --to=2026-09  # rentang bulan
+php artisan readings:audit --months=3                   # 3 bulan terakhir
+php artisan readings:audit --month=2026-08 --all        # termasuk yang sudah cocok
+```
+
+Keluarannya menunjukkan selisihnya sekaligus menebak penyebabnya:
+
+```
+| Meter      | Bulan   | Hari  | Chart (kWh) | Invoice (kWh) | Selisih  | Dugaan                           |
+| PM001      | 2026-08 | 25/31 | 194.845,38  | 202.924,43    | 8.079,05 | 1 hari tanpa agregat: 2026-08-10 |
+```
+
+Kolom **Hari** (`25/31`) adalah jumlah baris agregat dibanding jumlah hari
+dalam periode — itu petunjuk pertama kalau ada yang bolong.
+
+### Memperbaiki
+
+```bash
+php artisan readings:aggregate --month=2026-08          # bangun ulang satu bulan
+php artisan readings:aggregate --from=2026-07-01 --to=2026-08-31
+php artisan readings:aggregate --date=2026-08-10        # satu hari
+```
+
+Aman diulang: memakai `updateOrCreate`, jadi menjalankannya berkali-kali
+memperbaiki angkanya, bukan menggandakan.
+
+### Yang TIDAK dilaporkan audit
+
+Bulan yang pembacaan mentahnya sudah dibuang retensi **dilewati**, bukan
+dilaporkan bermasalah. Di bulan seperti itu tidak ada pembanding — dan itu
+memang rancangannya: `readings:prune` membuang `meter_readings` lama tapi
+**tidak pernah** menyentuh agregat hariannya, supaya riwayat jangka panjang
+tetap utuh.
+
+Karena alasan yang sama, `readings:aggregate` melewati hari yang tidak punya
+pembacaan sama sekali — membangun ulang bulan lama tidak akan menimpa
+agregatnya dengan nol.
+
+> **Catatan data demo.** `DemoDataSeeder` menulis baris `meter_reading_dailies`
+> langsung, bukan menurunkannya dari pembacaan mentah. Untuk meter yang
+> di-reset, angkanya tidak cocok dengan pembacaannya sendiri — jadi
+> `readings:audit` akan melaporkannya sebagai tidak cocok pada database
+> demo. Itu bawaan seeder, bukan gejala masalah produksi.
 
 ## Laporan data meter mentah
 

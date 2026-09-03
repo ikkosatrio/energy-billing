@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BlankToNull;
+
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,7 +17,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Customer extends Model
 {
-    use HasFactory, SoftDeletes;
+    use BlankToNull, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'code',
@@ -102,5 +104,30 @@ class Customer extends Model
         return $query->active()
             ->whereNotNull('power_meter_id')
             ->whereNotNull('tariff_group_id');
+    }
+
+    /**
+     * Pelanggan yang siap ditagih UNTUK SATU PERIODE tertentu.
+     *
+     * Tanpa penyaringan tanggal, pelanggan yang kontraknya baru mulai bulan
+     * ini tetap ikut terjaring saat periode bulan lalu digenerate — dan ia
+     * menerima invoice berisi 0 kWh tapi tetap dikenai biaya tetap (biaya
+     * beban dan biaya admin) untuk bulan ketika ia belum tersambung sama
+     * sekali. Hal yang sama berlaku terbalik untuk pelanggan yang kontraknya
+     * sudah berakhir.
+     *
+     * Kolom tanggal yang kosong sengaja tidak menyaring apa pun: pelanggan
+     * lama yang tanggal kontraknya belum pernah diisi harus tetap tertagih
+     * seperti sebelumnya, bukan hilang diam-diam dari hasil generate.
+     */
+    public function scopeBillableForPeriod(Builder $query, string $periodStart, string $periodEnd): Builder
+    {
+        return $query->billable()
+            // Belum jadi pelanggan sepanjang periode ini.
+            ->where(fn (Builder $q) => $q->whereNull('contract_start')
+                ->orWhere('contract_start', '<=', $periodEnd))
+            // Kontraknya sudah berakhir sebelum periode ini dimulai.
+            ->where(fn (Builder $q) => $q->whereNull('contract_end')
+                ->orWhere('contract_end', '>=', $periodStart));
     }
 }

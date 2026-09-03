@@ -78,6 +78,71 @@ class InvoiceGenerationTest extends TestCase
         return Invoice::firstOrFail();
     }
 
+    // ── Masa kontrak ─────────────────────────────────────────────────────
+
+    /**
+     * Pelanggan yang kontraknya baru mulai setelah periode berakhir belum
+     * tersambung sama sekali pada bulan itu. Menagihkannya menghasilkan
+     * invoice 0 kWh yang tetap membebankan biaya admin dan biaya beban untuk
+     * bulan yang tidak pernah ia pakai.
+     */
+    public function test_pelanggan_yang_kontraknya_belum_mulai_tidak_digenerate(): void
+    {
+        $this->scenario(['contract_start' => '2026-09-01']);
+
+        $generator = app(InvoiceGenerator::class);
+        $hasil = $generator->generate($generator->periodFor(Carbon::parse('2026-07-01')));
+
+        $this->assertSame(0, $hasil['created']);
+        $this->assertSame(0, Invoice::count());
+    }
+
+    /** Kontrak yang mulai di TENGAH periode tetap ditagih untuk bulan itu. */
+    public function test_kontrak_yang_mulai_di_tengah_periode_tetap_digenerate(): void
+    {
+        $this->scenario(['contract_start' => '2026-07-20']);
+
+        $generator = app(InvoiceGenerator::class);
+        $hasil = $generator->generate($generator->periodFor(Carbon::parse('2026-07-01')));
+
+        $this->assertSame(1, $hasil['created']);
+    }
+
+    public function test_pelanggan_yang_kontraknya_sudah_berakhir_tidak_digenerate(): void
+    {
+        $this->scenario(['contract_end' => '2026-06-30']);
+
+        $generator = app(InvoiceGenerator::class);
+        $hasil = $generator->generate($generator->periodFor(Carbon::parse('2026-07-01')));
+
+        $this->assertSame(0, $hasil['created']);
+        $this->assertSame(0, Invoice::count());
+    }
+
+    /** Kontrak yang berakhir di tengah periode tetap ditagih untuk bulan itu. */
+    public function test_kontrak_yang_berakhir_di_tengah_periode_tetap_digenerate(): void
+    {
+        $this->scenario(['contract_end' => '2026-07-15']);
+
+        $generator = app(InvoiceGenerator::class);
+
+        $this->assertSame(1, $generator->generate($generator->periodFor(Carbon::parse('2026-07-01')))['created']);
+    }
+
+    /**
+     * Tanggal kontrak yang kosong tidak boleh menyaring apa pun — pelanggan
+     * lama yang datanya belum pernah diisi harus tetap tertagih seperti
+     * sebelumnya, bukan hilang diam-diam dari hasil generate.
+     */
+    public function test_tanggal_kontrak_kosong_tetap_digenerate(): void
+    {
+        $this->scenario(['contract_start' => null, 'contract_end' => null]);
+
+        $generator = app(InvoiceGenerator::class);
+
+        $this->assertSame(1, $generator->generate($generator->periodFor(Carbon::parse('2026-07-01')))['created']);
+    }
+
     public function test_pemakaian_dihitung_dari_selisih_stand(): void
     {
         $this->scenario();

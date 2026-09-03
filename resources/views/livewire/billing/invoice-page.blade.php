@@ -12,7 +12,7 @@
         <div class="card">
             <div class="stat-label">Terbayar {{ $summary['paid_last_month_label'] }}</div>
             <div class="stat-value sm" style="margin-top:8px">{{ rupiah($summary['paid_last_month']) }}</div>
-            <div class="stat-foot up">Invoice berstatus lunas</div>
+            <div class="stat-foot up">Pembayaran diterima atas tagihan periode ini</div>
         </div>
         <div class="card">
             <div class="stat-label">Draft Menunggu Terbit</div>

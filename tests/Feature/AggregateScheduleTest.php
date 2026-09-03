@@ -78,13 +78,48 @@ class AggregateScheduleTest extends TestCase
      */
     public function test_agregasi_dijadwalkan_per_menit_untuk_hari_ini(): void
     {
-        $events = collect(app(Schedule::class)->events())
-            ->filter(fn ($event) => str_contains($event->command ?? '', 'readings:aggregate'));
+        $byExpression = $this->jadwalAgregasi();
 
-        $byExpression = $events->mapWithKeys(fn ($event) => [$event->expression => $event->command]);
-
-        $this->assertCount(2, $events);
         $this->assertStringContainsString('--today', $byExpression['* * * * *']);
         $this->assertStringNotContainsString('--today', $byExpression['0 * * * *']);
+    }
+
+    /**
+     * Pengejaran mingguan wajib ada.
+     *
+     * Dua jadwal lain hanya mencakup kemarin dan hari ini, jadi gangguan yang
+     * lebih lama dari sehari meninggalkan hari tanpa agregat yang tidak pernah
+     * terkejar sendiri — dan chart bulanan akan terus membaca lebih rendah
+     * daripada invoice untuk bulan itu tanpa ada yang memberi tahu.
+     */
+    public function test_ada_pengejaran_mingguan_ke_belakang(): void
+    {
+        $byExpression = $this->jadwalAgregasi();
+
+        $this->assertArrayHasKey('0 3 * * 0', $byExpression, 'Pengejaran mingguan tidak terdaftar.');
+
+        $mingguan = $byExpression['0 3 * * 0'];
+
+        $this->assertStringContainsString('--from', $mingguan);
+        $this->assertStringNotContainsString('--today', $mingguan);
+
+        // Rentangnya harus melampaui sebulan supaya bulan sebelumnya masih
+        // ikut terkoreksi setelah invoicenya terbit.
+        preg_match("/--from='?(\d{4}-\d{2}-\d{2})'?/", $mingguan, $cocok);
+        $this->assertNotEmpty($cocok, "Tanggal --from tidak terbaca dari: {$mingguan}");
+        $this->assertGreaterThanOrEqual(
+            35,
+            Carbon::parse($cocok[1])->diffInDays(Carbon::today()),
+            'Rentang pengejaran terlalu pendek untuk menutup bulan sebelumnya.',
+        );
+    }
+
+    /** @return array<string, string> ekspresi cron => perintah */
+    private function jadwalAgregasi(): array
+    {
+        return collect(app(Schedule::class)->events())
+            ->filter(fn ($event) => str_contains($event->command ?? '', 'readings:aggregate'))
+            ->mapWithKeys(fn ($event) => [$event->expression => $event->command])
+            ->all();
     }
 }

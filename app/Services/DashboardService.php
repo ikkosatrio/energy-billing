@@ -48,20 +48,43 @@ class DashboardService
     }
 
     /**
-     * Nilai tagihan periode berjalan — invoice yang sudah terbit bulan ini.
+     * Nilai tagihan periode yang sedang ditagihkan.
+     *
+     * Dasarnya PERIODE PEMAKAIAN, bukan tanggal terbit invoice.
+     *
+     * Tagihan listrik selalu menagih bulan yang sudah selesai — invoice yang
+     * terbit awal September berisi pemakaian Agustus. Dengan tanggal terbit
+     * sebagai dasar, kartu ini berlabel "01 Sep – 30 Sep" tapi isinya uang
+     * atas pemakaian Agustus, dan setiap awal bulan sebelum generate
+     * dijalankan angkanya Rp 0 — terbaca seperti tidak ada tagihan sama
+     * sekali, padahal tagihan yang belum dibayar masih berjalan.
+     *
+     * Periode yang dipakai sama dengan yang dipakai perintah generate
+     * (now()->subMonth()), sehingga angka di dashboard dan periode yang
+     * ditagihkan operator selalu bicara tentang bulan yang sama.
+     *
+     * Invoice draft tidak dihitung. Draft belum ditagihkan ke siapa pun dan
+     * angkanya masih berubah setiap kali digenerate ulang — memasukkannya
+     * membuat kartu ini bergerak tanpa ada transaksi apa pun, dan membuatnya
+     * berbeda aturan dengan kartu Belum Dibayar di sebelahnya.
      */
     public function currentBilling(): array
     {
-        $start = now()->startOfMonth();
-        $end = now()->endOfMonth();
+        $period = now()->subMonth();
+        $start = $period->copy()->startOfMonth();
+        $end = $period->copy()->endOfMonth();
 
-        $total = (float) Invoice::whereBetween('issue_date', [$start, $end])
-            ->where('status', '!=', 'cancelled')
-            ->sum('total_amount');
+        $invoices = Invoice::whereBetween('period_start', [$start->toDateString(), $end->toDateString()])
+            ->whereNotIn('status', ['cancelled', 'draft']);
 
         return [
-            'total' => $total,
+            'total' => (float) $invoices->sum('total_amount'),
             'label' => $start->translatedFormat('d M').' – '.$end->translatedFormat('d M Y'),
+            // Nol karena belum ditagihkan berbeda artinya dari nol karena
+            // tidak ada pemakaian. Tanpa penanda ini keduanya terlihat sama
+            // di layar, dan periode yang terlewat digenerate tidak terlihat
+            // oleh siapa pun sampai pelanggan menanyakan tagihannya.
+            'issued_count' => $invoices->count(),
         ];
     }
 

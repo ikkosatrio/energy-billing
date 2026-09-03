@@ -63,7 +63,18 @@ class InvoiceGenerator
         $skipped = 0;
         $failed = [];
 
-        $customers = Customer::billable()
+        /*
+         * Disaring per periode, bukan sekadar "pelanggan aktif".
+         *
+         * Pelanggan yang kontraknya baru mulai setelah periode ini berakhir
+         * belum tersambung sama sekali pada bulan itu — menagihkannya
+         * menghasilkan invoice 0 kWh yang tetap membebankan biaya admin dan
+         * biaya beban untuk bulan yang tidak pernah ia pakai.
+         */
+        $customers = Customer::billableForPeriod(
+            $period->period_start->toDateString(),
+            $period->period_end->toDateString(),
+        )
             ->when($customerIds, fn ($q) => $q->whereIn('id', $customerIds))
             ->with(['powerMeter', 'tariffGroup'])
             ->get();

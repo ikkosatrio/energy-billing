@@ -45,7 +45,11 @@
         <div class="stat-icon green"><i data-lucide="receipt" style="width:16px;height:16px"></i></div>
       </div>
       <div class="stat-value sm">{{ rupiah($billing['total']) }}</div>
-      <div class="stat-foot">Periode {{ $billing['label'] }}</div>
+      @if ($billing['issued_count'] > 0)
+        <div class="stat-foot">Periode {{ $billing['label'] }}</div>
+      @else
+        <div class="stat-foot down">Periode {{ $billing['label'] }} belum digenerate</div>
+      @endif
     </div>
 
     <div class="stat" style="animation-delay:.12s">

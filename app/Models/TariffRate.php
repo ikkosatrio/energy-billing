@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BlankToNull;
+
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -9,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TariffRate extends Model
 {
-    use HasFactory;
+    use BlankToNull, HasFactory;
 
     protected $fillable = [
         'tariff_group_id',

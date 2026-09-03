@@ -82,7 +82,13 @@ class PeriodPage extends Component
                 ->orderByDesc('period_start')
                 ->limit(24)
                 ->get(),
-            'billableCount' => Customer::billable()->count(),
+            // Dihitung untuk bulan yang sedang dipilih, bukan untuk hari ini:
+            // angka ini adalah pratinjau berapa invoice yang akan terbentuk,
+            // jadi harus memakai penyaringan yang sama dengan generate.
+            'billableCount' => Customer::billableForPeriod(
+                Carbon::parse($this->month.'-01')->startOfMonth()->toDateString(),
+                Carbon::parse($this->month.'-01')->endOfMonth()->toDateString(),
+            )->count(),
             // Pelanggan aktif yang belum lengkap datanya tidak akan ikut
             // ditagih — ditampilkan agar tidak diam-diam terlewat.
             'incompleteCount' => Customer::active()
