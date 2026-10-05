@@ -194,7 +194,25 @@ class MailSettingTest extends TestCase
 
     // ── Email uji ────────────────────────────────────────────────────────
 
-    public function test_email_uji_dikirim_ke_alamat_operator(): void
+    /**
+     * Tujuannya alamat pengirim yang sedang disetel, bukan alamat operator:
+     * satu kiriman menguji kredensial SMTP sekaligus memastikan alamat
+     * pengirimnya memang kotak yang bisa diperiksa.
+     */
+    public function test_email_uji_dikirim_ke_alamat_pengirim_yang_disetel(): void
+    {
+        Mail::fake();
+        app(SettingService::class)->put('mail_from_address', 'billing@perusahaan.test');
+
+        Livewire::test(SettingPage::class)
+            ->call('sendTestEmail')
+            ->assertDispatched('toast', type: 'success');
+
+        Mail::assertSent(SmtpTestMail::class, fn ($mail) => $mail->hasTo('billing@perusahaan.test'));
+    }
+
+    /** Email Pengirim kosong berarti setelan mail masih ikut .env. */
+    public function test_email_uji_jatuh_ke_alamat_operator_bila_pengirim_kosong(): void
     {
         Mail::fake();
 

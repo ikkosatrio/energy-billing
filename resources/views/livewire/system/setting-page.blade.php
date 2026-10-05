@@ -304,10 +304,31 @@
 
                         <div class="field">
                             <label class="field-label">SMTP Password</label>
-                            <input type="password" class="input @error('values.mail_password') is-invalid @enderror"
-                                   wire:model="values.mail_password"
-                                   autocomplete="new-password"
-                                   placeholder="{{ $mailPasswordStored ? 'Tersimpan — kosongkan bila tidak diubah' : 'Belum diisi' }}">
+                            {{--
+                              Tombol intip hanya berlaku untuk password yang SEDANG DIKETIK.
+                              Password yang sudah tersimpan tetap tidak bisa dilihat kembali —
+                              nilainya memang tidak pernah dikirim ke browser. Gunanya untuk
+                              memastikan App Password yang baru disalin tidak kemasukan spasi
+                              atau karakter yang terpotong, sebab kesalahan semacam itu baru
+                              ketahuan sebagai kegagalan autentikasi berhari-hari kemudian.
+                            --}}
+                            <div class="input-row" x-data="{ terlihat: false }">
+                                <input x-bind:type="terlihat ? 'text' : 'password'" type="password"
+                                       class="input @error('values.mail_password') is-invalid @enderror"
+                                       wire:model="values.mail_password"
+                                       autocomplete="new-password" spellcheck="false"
+                                       placeholder="{{ $mailPasswordStored ? 'Tersimpan — kosongkan bila tidak diubah' : 'Belum diisi' }}">
+                                <button type="button" class="btn-icon"
+                                        x-on:click="terlihat = !terlihat"
+                                        x-bind:title="terlihat ? 'Sembunyikan password' : 'Lihat password yang diketik'"
+                                        x-bind:aria-label="terlihat ? 'Sembunyikan password' : 'Lihat password yang diketik'">
+                                    {{-- Ikon dibungkus span: lucide mengganti elemen <i> dengan
+                                         <svg>, sehingga direktif Alpine yang menempel langsung
+                                         pada <i> ikut hilang saat ikonnya dirender. --}}
+                                    <span x-show="!terlihat"><i data-lucide="eye" style="width:16px;height:16px"></i></span>
+                                    <span x-show="terlihat" x-cloak><i data-lucide="eye-off" style="width:16px;height:16px"></i></span>
+                                </button>
+                            </div>
                             @error('values.mail_password') <div class="field-error">{{ $message }}</div> @enderror
                             <div class="card-sub">
                                 Disimpan terenkripsi dan tidak pernah ditampilkan kembali.
@@ -355,8 +376,14 @@
                                 <span wire:loading.remove wire:target="sendTestEmail">Kirim Email Uji</span>
                                 <span wire:loading wire:target="sendTestEmail">Mengirim…</span>
                             </button>
+                            @php
+                                // Tujuannya dibaca dari setelan yang SUDAH tersimpan, bukan dari
+                                // isian di layar — supaya alamat yang tertulis di sini sama persis
+                                // dengan yang nanti benar-benar dikirimi.
+                                $tujuanUji = trim((string) setting('mail_from_address', '')) ?: (auth()->user()->email ?: '—');
+                            @endphp
                             <div class="card-sub" style="margin-top:8px">
-                                Dikirim ke <span class="mono">{{ auth()->user()->email ?: '—' }}</span> memakai setelan
+                                Dikirim ke <span class="mono">{{ $tujuanUji }}</span> memakai setelan
                                 yang <strong>sudah disimpan</strong> — tekan Simpan Perubahan dulu bila baru diubah.
                                 Dikirim langsung tanpa antrean, jadi kegagalannya langsung terlihat di sini.
                             </div>

@@ -238,11 +238,11 @@ class SettingPage extends Component
     {
         $this->authorize('setting.manage');
 
-        $to = auth()->user()?->email;
+        $to = $this->testEmailRecipient();
 
         if (!$to) {
             $this->dispatch('toast', type: 'error',
-                message: 'Akun Anda belum punya alamat email, jadi tidak ada tujuan uji.');
+                message: 'Belum ada tujuan uji: isi Email Pengirim di atas, atau lengkapi alamat email pada akun Anda.');
 
             return;
         }
@@ -259,6 +259,22 @@ class SettingPage extends Component
 
         ActivityLogger::log('update_setting', description: "Kirim email uji SMTP ke {$to}");
         $this->dispatch('toast', type: 'success', message: "Email uji terkirim ke {$to}.");
+    }
+
+    /**
+     * Tujuan email uji: alamat pengirim yang sedang disetel.
+     *
+     * Mengirim ke diri sendiri membuat satu kiriman menguji dua sisi
+     * sekaligus — kredensial SMTP-nya benar, DAN alamat pengirimnya memang
+     * kotak yang bisa diperiksa operator. Alamat akun operator dipakai hanya
+     * bila Email Pengirim belum diisi, misalnya saat setelan mail masih
+     * mengikuti .env.
+     */
+    private function testEmailRecipient(): ?string
+    {
+        $pengirim = trim((string) setting('mail_from_address', ''));
+
+        return $pengirim !== '' ? $pengirim : auth()->user()?->email;
     }
 
     public function render()
